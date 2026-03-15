@@ -17,10 +17,6 @@ public class CommentReq {
      */
     private String comment_text;
     /**
-     * 用户鉴权token
-     */
-    private String token;
-    /**
      * 视频id
      */
     private String video_id;

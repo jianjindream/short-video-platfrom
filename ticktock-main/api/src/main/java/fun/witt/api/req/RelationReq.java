@@ -12,8 +12,4 @@ public class RelationReq {
      * 对方用户id
      */
     private String to_user_id;
-    /**
-     * 用户鉴权token
-     */
-    private String token;
 }

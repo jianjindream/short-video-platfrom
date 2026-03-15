@@ -9,10 +9,6 @@ public class FavoriteReq {
      */
     private String action_type;
     /**
-     * 用户鉴权token
-     */
-    private String token;
-    /**
      * 视频id
      */
     private String video_id;

@@ -28,6 +28,11 @@ spring:
       discovery:
         server-addr: nacos:8848
         service: ${spring.application.name}
+  redis:
+    host: redis
+    port: 6379
+    database: 0
+    timeout: 3000
   servlet:
     multipart:
       max-file-size: 128MB
@@ -36,6 +41,8 @@ spring:
 jwt:
   issuer: ticktock
   signed: VGlrVG9rCg==
+  access-token-validity-ms: 1800000
+  refresh-token-validity-ms: 604800000
 
 # 整合mybatis
 mybatis:

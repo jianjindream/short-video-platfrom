@@ -4,9 +4,10 @@ package fun.witt.relation.controller;
 import fun.witt.api.req.RelationReq;
 import fun.witt.api.req.UserReq;
 import fun.witt.api.vo.ResultVO;
-import fun.witt.common.template.JWTTemplate;
+import fun.witt.common.auth.LoginUser;
 import fun.witt.relation.service.RelationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,28 +20,22 @@ public class RelationController {
     @Autowired
     private RelationService relationService;
 
-    @Autowired
-    private JWTTemplate jwtTemplate;
-
     @PostMapping("/action")
-    public ResultVO action(RelationReq req) {
-        Number loginUserID = jwtTemplate.getUserIDFromToken(req.getToken());
+    public ResultVO action(@AuthenticationPrincipal LoginUser loginUser, RelationReq req) {
         return relationService.followAction(req.getAction_type(),
                 Long.parseLong(req.getTo_user_id()),
-                loginUserID.longValue());
+                loginUser.getUserId());
     }
 
     @GetMapping("/follow/list")
-    public ResultVO followList(UserReq req) {
-        Number loginUserID = jwtTemplate.getUserIDFromToken(req.getToken());
+    public ResultVO followList(@AuthenticationPrincipal LoginUser loginUser, UserReq req) {
         return relationService.followList(Long.parseLong(req.getUser_id()),
-                loginUserID.longValue());
+                loginUser.getUserId());
     }
 
     @GetMapping("/follower/list")
-    public ResultVO followerList(UserReq req) {
-        Number loginUserID = jwtTemplate.getUserIDFromToken(req.getToken());
+    public ResultVO followerList(@AuthenticationPrincipal LoginUser loginUser, UserReq req) {
         return relationService.followerList(Long.parseLong(req.getUser_id()),
-                loginUserID.longValue());
+                loginUser.getUserId());
     }
 }

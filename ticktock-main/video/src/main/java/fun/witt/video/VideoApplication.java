@@ -9,7 +9,7 @@ import tk.mybatis.spring.annotation.MapperScan;
 @MapperScan(basePackages = "fun.witt.mapper")
 @EnableFeignClients(basePackages = {"fun.witt.api.feign"})
 @EnableDiscoveryClient
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "fun.witt")
 public class VideoApplication {
 
     public static void main(String[] args) {

@@ -8,10 +8,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Setter
 public class PublishReq {
     /**
-     * 用户鉴权token
-     */
-    private String token;
-    /**
      * 视频标题
      */
     private String title;

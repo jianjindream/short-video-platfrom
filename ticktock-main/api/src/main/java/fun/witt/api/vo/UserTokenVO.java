@@ -7,5 +7,8 @@ import lombok.EqualsAndHashCode;
 @Data
 public class UserTokenVO extends ResultVO {
     private long userID;
-    private String token;
+    private String accessToken;
+    private String refreshToken;
+    private long accessTokenExpireIn;
+    private long refreshTokenExpireIn;
 }
