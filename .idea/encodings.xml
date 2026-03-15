@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/ticktock-main/api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/comment/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/comment/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/favorite/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/favorite/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/gateway/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/gateway/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/model/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/model/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/relation/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/relation/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/user/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/user/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/video/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ticktock-main/video/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
