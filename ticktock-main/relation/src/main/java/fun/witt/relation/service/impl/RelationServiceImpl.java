@@ -30,15 +30,16 @@ public class RelationServiceImpl implements RelationService {
     public ResultVO followAction(String actionType, long userID, long loginUserID) {
         // todo sync follow count
         switch (actionType) {
-            case Constant.RELATION_FOLLOW -> {
+            case Constant.RELATION_FOLLOW: {
                 Relation relation = new Relation();
                 relation.setFollowId(userID);
                 relation.setFollowerId(loginUserID);
                 if (relationMapper.insert(relation) > 0) {
                     return ResultVO.ok();
                 }
+                break;
             }
-            case Constant.RELATION_UNFOLLOW -> {
+            case Constant.RELATION_UNFOLLOW: {
                 Example example = new Example(Relation.class);
                 Example.Criteria criteria = example.createCriteria();
                 criteria.andEqualTo("followId", userID);
@@ -46,6 +47,7 @@ public class RelationServiceImpl implements RelationService {
                 if (relationMapper.deleteByExample(example) > 0) {
                     return ResultVO.ok();
                 }
+                break;
             }
         }
         return ResultVO.fail("");
@@ -72,7 +74,7 @@ public class RelationServiceImpl implements RelationService {
         List<Relation> relationList = relationMapper.selectByExample(example);
 
         UserListVO vo = new UserListVO();
-        List<Long> followUserIDList = relationList.stream().map(Relation::getFollowId).toList();
+        List<Long> followUserIDList = relationList.stream().map(Relation::getFollowId).collect(Collectors.toList());
         if (followUserIDList.isEmpty()) {
             return vo;
         }
@@ -84,7 +86,7 @@ public class RelationServiceImpl implements RelationService {
         List<UserExt> userExtList = userFeignClient.batchUserInfo(followUserIDList, 0);
         userExtList = userExtList.stream()
                 .peek(userExt -> userExt.setFollow(followStateDict.getOrDefault(userExt.getId(), false)))
-                .toList();
+                .collect(Collectors.toList());
         vo.setUserList(userExtList);
         return vo;
     }
@@ -100,7 +102,7 @@ public class RelationServiceImpl implements RelationService {
         List<Relation> relationList = relationMapper.selectByExample(example);
 
         UserListVO vo = new UserListVO();
-        List<Long> followerUserIDList = relationList.stream().map(Relation::getFollowerId).toList();
+        List<Long> followerUserIDList = relationList.stream().map(Relation::getFollowerId).collect(Collectors.toList());
         if (followerUserIDList.isEmpty()) {
             return vo;
         }
@@ -112,9 +114,9 @@ public class RelationServiceImpl implements RelationService {
         List<UserExt> userExtList = userFeignClient.batchUserInfo(followerUserIDList, 0);
         userExtList = userExtList.stream()
                 .peek(userExt -> userExt.setFollow(followerStateDict.getOrDefault(userExt.getId(), false)))
-                .toList();
+                .collect(Collectors.toList());
         vo.setUserList(userExtList);
-        return null;
+        return vo;
     }
 
 }

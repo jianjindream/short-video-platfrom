@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+import io.jsonwebtoken.Claims;
+
 @Service
 public class AuthService {
 
@@ -52,7 +54,7 @@ public class AuthService {
 
     public ResultVO refresh(String refreshToken) {
         try {
-            var claims = jwtService.parseRefreshToken(refreshToken);
+            Claims claims = jwtService.parseRefreshToken(refreshToken);
             String jti = claims.getId();
             Long tokenUserId = refreshTokenStore.getUserId(jti);
             if (tokenUserId == null) {
@@ -78,7 +80,7 @@ public class AuthService {
 
     public ResultVO logout(String refreshToken) {
         try {
-            var claims = jwtService.parseRefreshToken(refreshToken);
+            Claims claims = jwtService.parseRefreshToken(refreshToken);
             refreshTokenStore.delete(claims.getId());
         } catch (Exception ignored) {
         }

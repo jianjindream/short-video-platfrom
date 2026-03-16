@@ -13,6 +13,7 @@ import tk.mybatis.mapper.entity.Example;
 
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class CommentServiceImpl implements CommentService {
@@ -70,7 +71,7 @@ public class CommentServiceImpl implements CommentService {
             CommentExt commentExt = ConvertUtil.convertComment(comment);
             commentExt.setUser(userFeignClient.getUserInfo(comment.getUserId(), loginUserID));
             return commentExt;
-        }).toList();
+        }).collect(Collectors.toList());
         vo.setCommentList(commentExtList);
         return vo;
     }

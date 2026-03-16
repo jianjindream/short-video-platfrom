@@ -129,7 +129,7 @@ public class VideoServiceImpl implements VideoService {
     }
 
     private List<VideoExt> convertVideoExtList(List<Video> videoList, long loginUserID) {
-        List<Long> videoIDList = videoList.parallelStream().map(Video::getId).toList();
+        List<Long> videoIDList = videoList.parallelStream().map(Video::getId).collect(Collectors.toList());
         Map<Long, Boolean> favoriteStateDict = favoriteFeignClient.batchFavoriteState(videoIDList, loginUserID);
 
         return videoList.parallelStream()

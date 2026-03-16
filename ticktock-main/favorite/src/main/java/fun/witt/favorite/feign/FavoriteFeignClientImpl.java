@@ -27,8 +27,7 @@ public class FavoriteFeignClientImpl implements FavoriteFeignClient {
         Example example = new Example(Favorite.class);
         Example.Criteria criteria = example.createCriteria();
         criteria.andEqualTo("userId", userID);
-        Example.Criteria criteria1 = example.createCriteria();
-        criteria1.andIn("videoId", videoIDList);
+        criteria.andIn("videoId", videoIDList);
         List<Favorite> favoriteList = favoriteMapper.selectByExample(example);
 
         Map<Long, Boolean> result = Maps.newHashMap();
@@ -50,6 +49,6 @@ public class FavoriteFeignClientImpl implements FavoriteFeignClient {
         }
         return favoriteList.stream()
                 .map(Favorite::getVideoId)
-                .toList();
+                .collect(Collectors.toList());
     }
 }

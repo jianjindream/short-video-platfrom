@@ -25,17 +25,16 @@ public class CommentController {
         long loginUserID = loginUser.getUserId();
         // todo text UGC check
         switch (req.getAction_type()) {
-            case Constant.COMMENT_PUBLISH -> {
+            case Constant.COMMENT_PUBLISH:
                 return commentService.publish(Long.parseLong(req.getVideo_id()),
                         loginUserID,
                         req.getComment_text());
-            }
-            case Constant.COMMENT_REMOVE -> {
+            case Constant.COMMENT_REMOVE:
                 return commentService.delete(Long.parseLong(req.getComment_id()),
                         loginUserID);
-            }
+            default:
+                return ResultVO.fail("fail");
         }
-        return ResultVO.fail("fail");
     }
 
     @GetMapping("/list")

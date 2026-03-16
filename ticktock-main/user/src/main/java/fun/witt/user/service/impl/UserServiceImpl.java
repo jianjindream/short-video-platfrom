@@ -13,6 +13,7 @@ import tk.mybatis.mapper.entity.Example;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -75,6 +76,6 @@ public class UserServiceImpl implements UserService {
                 userExt.setFollow(feignClient.followState(user.getId(), loginUserID));
             }
             return userExt;
-        }).toList();
+        }).collect(Collectors.toList());
     }
 }
