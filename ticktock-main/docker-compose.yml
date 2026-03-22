@@ -10,6 +10,8 @@ services:
     ports:
       - "8848:8848"
       - "9848:9848"
+    networks:
+      - ticktock-net
   minio:
     image: minio/minio
     restart: on-failure
@@ -23,6 +25,8 @@ services:
       - "9001:9001"
     entrypoint: sh
     command: -c 'mkdir -p /export/ticktock && minio server /export --console-address ":9001"'
+    networks:
+      - ticktock-net
   ticktock-db:
     image: mariadb:10.4
     restart: on-failure
@@ -32,31 +36,96 @@ services:
       - ./deploy/mysql/initdb/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "3306:3306"
+    networks:
+      - ticktock-net
+  redis:
+    image: redis:7-alpine
+    restart: on-failure
+    ports:
+      - "6379:6379"
+    networks:
+      - ticktock-net
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    restart: on-failure
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ticktock-net
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    restart: on-failure
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - ticktock-net
   comment:
     build:
       context: comment
       dockerfile: Dockerfile
     image: comment:latest
+    depends_on:
+      - ticktock-db
+      - nacos
+      - redis
+    networks:
+      - ticktock-net
   favorite:
     build:
       context: favorite
       dockerfile: Dockerfile
     image: favorite:latest
+    depends_on:
+      - ticktock-db
+      - nacos
+      - redis
+      - kafka
+    networks:
+      - ticktock-net
   relation:
     build:
       context: relation
       dockerfile: Dockerfile
     image: relation:latest
+    depends_on:
+      - ticktock-db
+      - nacos
+      - redis
+      - kafka
+    networks:
+      - ticktock-net
   user:
     build:
       context: user
       dockerfile: Dockerfile
     image: user:latest
+    depends_on:
+      - ticktock-db
+      - nacos
+      - redis
+    networks:
+      - ticktock-net
   video:
     build:
       context: video
       dockerfile: Dockerfile
     image: video:latest
+    depends_on:
+      - ticktock-db
+      - nacos
+      - redis
+      - minio
+    networks:
+      - ticktock-net
   gateway:
     build:
       context: gateway
@@ -64,6 +133,9 @@ services:
     image: gateway:latest
     ports:
       - "8008:8008"
+    depends_on:
+      - nacos
+    networks:
+      - ticktock-net
 networks:
   ticktock-net:
-

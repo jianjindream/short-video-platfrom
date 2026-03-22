@@ -19,12 +19,17 @@ public class FavoriteController {
 
     @PostMapping("/action")
     public ResultVO action(@AuthenticationPrincipal LoginUser loginUser, FavoriteReq req) {
+        long authorId = 0;
+        if (req.getAuthor_id() != null) {
+            authorId = Long.parseLong(req.getAuthor_id());
+        }
+
         if (favoriteService.likeAction(req.getAction_type(),
                 Long.parseLong(req.getVideo_id()),
-                loginUser.getUserId())) {
+                loginUser.getUserId(),
+                authorId)) {
             return ResultVO.ok();
         }
         return ResultVO.fail("fail");
     }
-
 }

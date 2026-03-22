@@ -12,4 +12,8 @@ public class FavoriteReq {
      * 视频id
      */
     private String video_id;
+    /**
+     * 视频作者id（用于异步计数）
+     */
+    private String author_id;
 }

@@ -33,6 +33,8 @@ spring:
     port: 6379
     database: 0
     timeout: 3000
+  kafka:
+    bootstrap-servers: kafka:9092
 
 jwt:
   issuer: ticktock

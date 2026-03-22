@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="fun.witt.mapper.OutboxMapper">
+    <resultMap id="BaseResultMap" type="fun.witt.model.Outbox">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="aggregate_type" property="aggregateType" jdbcType="VARCHAR"/>
+        <result column="aggregate_id" property="aggregateId" jdbcType="VARCHAR"/>
+        <result column="payload" property="payload" jdbcType="VARCHAR"/>
+        <result column="created_at" property="createdAt" jdbcType="TIMESTAMP"/>
+        <result column="processed" property="processed" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <select id="selectUnprocessedBatch" resultMap="BaseResultMap">
+        SELECT id, aggregate_type, aggregate_id, payload, created_at, processed
+        FROM t_outbox
+        WHERE processed = 0
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="markAsProcessed">
+        UPDATE t_outbox SET processed = 1
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+</mapper>

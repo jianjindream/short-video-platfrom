@@ -73,4 +73,5 @@ minio:
   access-key-secret: ticktock@2023
   type: 0
   maxLength: 256
+  chunk-size: 5242880              # 分片大小：5MB（需 >= 5MB 以满足 S3 ComposeObject 约束）
 

@@ -4,6 +4,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import fun.witt.api.feign.RelationFeignClient;
 import fun.witt.api.utils.ConvertUtil;
 import fun.witt.api.vo.UserExt;
+import fun.witt.common.service.CounterService;
 import fun.witt.mapper.UserMapper;
 import fun.witt.model.User;
 import fun.witt.user.service.UserService;
@@ -24,6 +25,9 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private RelationFeignClient feignClient;
 
+    @Autowired
+    private CounterService counterService;
+
     @Override
     public User queryNameIsExist(String name) {
         Example userExample = new Example(User.class);
@@ -34,7 +38,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User createUser(String name, String password) {
-        // fixme salt
         String hex = DigestUtil.sha1Hex(password);
         User user = new User();
         user.setUserName(name);
@@ -53,7 +56,14 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserExt queryUserByID(long userID, long loginUserID) {
         User user = userMapper.selectByPrimaryKey(userID);
+        if (user == null) {
+            return null;
+        }
         UserExt userExt = ConvertUtil.convertUser(user);
+
+        // 从 Redis BITFIELD 读取实时计数，替代 MySQL 中的冗余计数字段
+        enrichWithRedisCounters(userExt, userID);
+
         if (loginUserID > 0) {
             userExt.setFollow(feignClient.followState(user.getId(), loginUserID));
         }
@@ -72,10 +82,31 @@ public class UserServiceImpl implements UserService {
 
         return userList.stream().map(user -> {
             UserExt userExt = ConvertUtil.convertUser(user);
+            enrichWithRedisCounters(userExt, user.getId());
             if (loginUserID > 0) {
                 userExt.setFollow(feignClient.followState(user.getId(), loginUserID));
             }
             return userExt;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 从 Redis BITFIELD 读取用户实时计数覆盖到 UserExt。
+     * 如果 Redis 中无数据（全为0），降级使用 MySQL 中的值。
+     */
+    private void enrichWithRedisCounters(UserExt userExt, long userId) {
+        try {
+            long[] counters = counterService.getUserCounters(userId);
+            long followCount = counters[0];
+            long followerCount = counters[1];
+            long favoritedCount = counters[2];
+
+            if (followCount > 0 || followerCount > 0 || favoritedCount > 0) {
+                userExt.setFollowCount(followCount);
+                userExt.setFollowerCount(followerCount);
+            }
+        } catch (Exception e) {
+            // Redis 不可用时降级，使用 MySQL 的值（已在 ConvertUtil 中设置）
+        }
     }
 }

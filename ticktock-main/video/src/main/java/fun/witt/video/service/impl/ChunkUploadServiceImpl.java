@@ -1,0 +1,232 @@
+package fun.witt.video.service.impl;
+
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.IdUtil;
+import fun.witt.api.vo.ChunkUploadInitVO;
+import fun.witt.api.vo.ResultVO;
+import fun.witt.api.vo.UploadProgressVO;
+import fun.witt.common.template.MinioTemplate;
+import fun.witt.mapper.VideoMapper;
+import fun.witt.model.Video;
+import fun.witt.video.service.ChunkUploadService;
+import fun.witt.video.utils.FfmpegUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+@Slf4j
+@Service
+public class ChunkUploadServiceImpl implements ChunkUploadService {
+
+    private static final String NORM_DAY_PATTERN = "yyyy-MM-dd";
+    private static final String UPLOAD_META_PREFIX = "chunk_upload:";
+    private static final String UPLOAD_PARTS_PREFIX = "chunk_upload_parts:";
+    private static final String CHUNK_TMP_PREFIX = "tmp/";
+    private static final long UPLOAD_EXPIRE_HOURS = 24;
+
+    @Value("${minio.chunk-size:5242880}")
+    private long chunkSize;
+
+    @Autowired
+    private MinioTemplate minioTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private VideoMapper videoMapper;
+
+    @Override
+    public ChunkUploadInitVO initUpload(long userId, String fileName, long fileSize, String title) {
+        ChunkUploadInitVO vo = new ChunkUploadInitVO();
+
+        if (fileName == null || fileName.isEmpty() || fileSize <= 0) {
+            vo.setStatusCode(1);
+            vo.setStatusMsg("参数不合法");
+            return vo;
+        }
+
+        String uploadId = IdUtil.simpleUUID();
+        int chunkCount = (int) Math.ceil((double) fileSize / chunkSize);
+
+        String ext = fileName.substring(fileName.lastIndexOf("."));
+        String objectName = DateUtil.format(new Date(), NORM_DAY_PATTERN) + "/" + IdUtil.simpleUUID() + ext;
+
+        Map<String, String> meta = new HashMap<>();
+        meta.put("userId", String.valueOf(userId));
+        meta.put("fileName", fileName);
+        meta.put("fileSize", String.valueOf(fileSize));
+        meta.put("objectName", objectName);
+        meta.put("title", title);
+        meta.put("chunkCount", String.valueOf(chunkCount));
+        meta.put("chunkSize", String.valueOf(chunkSize));
+        meta.put("status", "UPLOADING");
+        meta.put("createdAt", String.valueOf(System.currentTimeMillis()));
+
+        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        redisTemplate.opsForHash().putAll(metaKey, meta);
+        redisTemplate.expire(metaKey, UPLOAD_EXPIRE_HOURS, TimeUnit.HOURS);
+
+        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        redisTemplate.expire(partsKey, UPLOAD_EXPIRE_HOURS, TimeUnit.HOURS);
+
+        vo.setStatusCode(0);
+        vo.setStatusMsg("success");
+        vo.setUploadId(uploadId);
+        vo.setChunkSize(chunkSize);
+        vo.setChunkCount(chunkCount);
+        return vo;
+    }
+
+    @Override
+    public ResultVO uploadChunk(String uploadId, int chunkNumber, MultipartFile file) {
+        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
+        if (meta.isEmpty()) {
+            return ResultVO.fail("上传任务不存在或已过期");
+        }
+
+        String status = (String) meta.get("status");
+        if (!"UPLOADING".equals(status)) {
+            return ResultVO.fail("上传任务状态异常：" + status);
+        }
+
+        int chunkCount = Integer.parseInt((String) meta.get("chunkCount"));
+        if (chunkNumber < 1 || chunkNumber > chunkCount) {
+            return ResultVO.fail("分片编号超出范围：1~" + chunkCount);
+        }
+
+        String chunkObjectName = CHUNK_TMP_PREFIX + uploadId + "/" + chunkNumber;
+        try {
+            minioTemplate.uploadChunk(file.getBytes(), chunkObjectName, file.getContentType());
+        } catch (IOException e) {
+            log.error("分片上传失败，uploadId={}, chunkNumber={}", uploadId, chunkNumber, e);
+            return ResultVO.fail("分片上传失败");
+        }
+
+        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        redisTemplate.opsForHash().put(partsKey, String.valueOf(chunkNumber), "1");
+
+        return ResultVO.ok();
+    }
+
+    @Override
+    public ResultVO completeUpload(long userId, String uploadId) {
+        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
+        if (meta.isEmpty()) {
+            return ResultVO.fail("上传任务不存在或已过期");
+        }
+
+        String status = (String) meta.get("status");
+        if ("COMPLETED".equals(status)) {
+            return ResultVO.ok();
+        }
+        if (!"UPLOADING".equals(status)) {
+            return ResultVO.fail("上传任务状态异常：" + status);
+        }
+
+        long metaUserId = Long.parseLong((String) meta.get("userId"));
+        if (metaUserId != userId) {
+            return ResultVO.fail("无权操作此上传任务");
+        }
+
+        int chunkCount = Integer.parseInt((String) meta.get("chunkCount"));
+        String objectName = (String) meta.get("objectName");
+        String title = (String) meta.get("title");
+
+        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        Set<Object> uploadedParts = redisTemplate.opsForHash().keys(partsKey);
+        if (uploadedParts.size() < chunkCount) {
+            List<Integer> missing = IntStream.rangeClosed(1, chunkCount)
+                    .filter(i -> !uploadedParts.contains(String.valueOf(i)))
+                    .boxed()
+                    .collect(Collectors.toList());
+            return ResultVO.fail("分片未全部上传，缺少：" + missing);
+        }
+
+        List<String> sourceObjectNames = IntStream.rangeClosed(1, chunkCount)
+                .mapToObj(i -> CHUNK_TMP_PREFIX + uploadId + "/" + i)
+                .collect(Collectors.toList());
+
+        try {
+            minioTemplate.composeObject(objectName, sourceObjectNames);
+        } catch (Exception e) {
+            log.error("合并分片失败，uploadId={}", uploadId, e);
+            return ResultVO.fail("合并分片失败");
+        }
+
+        String coverObjectName;
+        try {
+            String videoUrl = minioTemplate.getObjectUrl(objectName);
+            byte[] coverBytes = FfmpegUtils.videoFrameFromUrl(videoUrl);
+            coverObjectName = objectName.substring(0, objectName.lastIndexOf(".")) + ".jpg";
+            if (coverBytes != null) {
+                minioTemplate.uploadFile(coverBytes, coverObjectName, "image/jpeg");
+            } else {
+                coverObjectName = "";
+            }
+        } catch (Exception e) {
+            log.warn("视频封面提取失败，uploadId={}，将使用空封面", uploadId, e);
+            coverObjectName = "";
+        }
+
+        Video video = new Video();
+        video.setFavoriteCount(0L);
+        video.setCommentCount(0L);
+        video.setAuthorId(userId);
+        video.setTitle(title);
+        video.setPlayUrl(objectName);
+        video.setCoverUrl(coverObjectName);
+        video.setPublishTime(new Date());
+        if (videoMapper.insert(video) <= 0) {
+            return ResultVO.fail("视频记录保存失败");
+        }
+
+        redisTemplate.opsForHash().put(metaKey, "status", "COMPLETED");
+
+        minioTemplate.removeObjects(sourceObjectNames);
+
+        return ResultVO.ok();
+    }
+
+    @Override
+    public UploadProgressVO getUploadProgress(String uploadId) {
+        UploadProgressVO vo = new UploadProgressVO();
+
+        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
+        if (meta.isEmpty()) {
+            vo.setStatusCode(1);
+            vo.setStatusMsg("上传任务不存在或已过期");
+            return vo;
+        }
+
+        int chunkCount = Integer.parseInt((String) meta.get("chunkCount"));
+        String status = (String) meta.get("status");
+
+        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        Set<Object> uploadedParts = redisTemplate.opsForHash().keys(partsKey);
+        List<Integer> uploadedChunkList = uploadedParts.stream()
+                .map(o -> Integer.parseInt(o.toString()))
+                .sorted()
+                .collect(Collectors.toList());
+
+        vo.setStatusCode(0);
+        vo.setStatusMsg("success");
+        vo.setUploadId(uploadId);
+        vo.setChunkCount(chunkCount);
+        vo.setUploadedChunks(uploadedChunkList);
+        vo.setStatus(status);
+        return vo;
+    }
+}

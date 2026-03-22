@@ -1,7 +1,7 @@
 package fun.witt.favorite.feign;
 
-import com.google.common.collect.Maps;
 import fun.witt.api.feign.FavoriteFeignClient;
+import fun.witt.favorite.service.FavoriteService;
 import fun.witt.mapper.FavoriteMapper;
 import fun.witt.model.Favorite;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,22 +20,17 @@ import java.util.stream.Collectors;
 public class FavoriteFeignClientImpl implements FavoriteFeignClient {
 
     @Autowired
+    private FavoriteService favoriteService;
+
+    @Autowired
     private FavoriteMapper favoriteMapper;
 
+    /**
+     * 批量查询点赞状态：优先走 Redis Bitmap，极速响应
+     */
     public Map<Long, Boolean> batchFavoriteState(@RequestParam("videoIDList") List<Long> videoIDList,
                                                  @RequestParam("userID") long userID) {
-        Example example = new Example(Favorite.class);
-        Example.Criteria criteria = example.createCriteria();
-        criteria.andEqualTo("userId", userID);
-        criteria.andIn("videoId", videoIDList);
-        List<Favorite> favoriteList = favoriteMapper.selectByExample(example);
-
-        Map<Long, Boolean> result = Maps.newHashMap();
-        if (favoriteList.isEmpty()) {
-            return result;
-        }
-
-        return favoriteList.stream().collect(Collectors.toMap(Favorite::getVideoId, favorite -> true));
+        return favoriteService.batchLikeState(videoIDList, userID);
     }
 
     @Override

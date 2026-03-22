@@ -24,21 +24,56 @@ CREATE TABLE `t_comment`
   DEFAULT CHARSET = utf8 COMMENT ='评论表';
 
 -- ----------------------------
--- Table structure for follows
+-- 主表: 关注关系 (following), 分片键 from_user_id
 -- ----------------------------
 DROP TABLE IF EXISTS `t_relation`;
 CREATE TABLE `t_relation`
 (
     `id`          bigint(20) NOT NULL AUTO_INCREMENT COMMENT '自增主键',
-    `follow_id`   bigint(20) NOT NULL COMMENT '用户id',
-    `follower_id` bigint(20) NOT NULL COMMENT '关注的用户',
+    `follow_id`   bigint(20) NOT NULL COMMENT '被关注的用户id (to_user_id)',
+    `follower_id` bigint(20) NOT NULL COMMENT '发起关注的用户id (from_user_id)',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `followIdtoFollowerIdIdx` (`follow_id`, `follower_id`) USING BTREE,
-    KEY `FollowIdIdx` (`follow_id`) USING BTREE,
-    KEY `FollowerIdIdx` (`follower_id`) USING BTREE
+    UNIQUE KEY `uk_from_to` (`follower_id`, `follow_id`) USING BTREE,
+    KEY `idx_follow_id` (`follow_id`) USING BTREE,
+    KEY `idx_follower_id` (`follower_id`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1096
-  DEFAULT CHARSET = utf8 COMMENT ='关注表';
+  DEFAULT CHARSET = utf8 COMMENT ='关注主表(following)';
+
+-- ----------------------------
+-- 从表: 粉丝关系 (follower), 分片键 to_user_id
+-- ----------------------------
+DROP TABLE IF EXISTS `t_follower`;
+CREATE TABLE `t_follower`
+(
+    `id`            bigint(20)  NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    `from_user_id`  bigint(20)  NOT NULL COMMENT '发起关注的用户id',
+    `to_user_id`    bigint(20)  NOT NULL COMMENT '被关注的用户id',
+    `created_at`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_from_to` (`from_user_id`, `to_user_id`) USING BTREE,
+    KEY `idx_to_user_id` (`to_user_id`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8 COMMENT ='粉丝从表(follower)';
+
+-- ----------------------------
+-- Outbox 事件表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_outbox`;
+CREATE TABLE `t_outbox`
+(
+    `id`             bigint(20)   NOT NULL AUTO_INCREMENT COMMENT '事件id',
+    `aggregate_type` varchar(32)  NOT NULL COMMENT '事件类型: FOLLOW / UNFOLLOW',
+    `aggregate_id`   varchar(64)  NOT NULL COMMENT '聚合ID',
+    `payload`        text         NOT NULL COMMENT '事件负载JSON',
+    `created_at`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `processed`      tinyint(1)   NOT NULL DEFAULT 0 COMMENT '是否已处理: 0-未处理 1-已处理',
+    PRIMARY KEY (`id`),
+    KEY `idx_processed_created` (`processed`, `created_at`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8 COMMENT ='Outbox事件表';
 
 -- ----------------------------
 -- Table structure for likes
