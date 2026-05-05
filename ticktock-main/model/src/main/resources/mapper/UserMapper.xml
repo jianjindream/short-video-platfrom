@@ -12,6 +12,7 @@
     <result column="follower_count" property="followerCount" jdbcType="BIGINT" />
     <result column="total_favorited" property="totalFavorited" jdbcType="BIGINT" />
     <result column="favorite_count" property="favoriteCount" jdbcType="BIGINT" />
+    <result column="collect_count" property="collectCount" jdbcType="BIGINT" />
     <result column="signature" property="signature" jdbcType="VARCHAR" />
     <result column="avatar" property="avatar" jdbcType="VARCHAR" />
     <result column="background_image" property="backgroundImage" jdbcType="VARCHAR" />

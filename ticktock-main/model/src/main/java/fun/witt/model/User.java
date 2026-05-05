@@ -47,6 +47,12 @@ public class User {
     private Long favoriteCount;
 
     /**
+     * 璇ョ敤鎴锋敹钘忕殑瑙嗛鏁伴噺
+     */
+    @Column(name = "collect_count")
+    private Long collectCount;
+
+    /**
      * 签名
      */
     private String signature;
@@ -186,6 +192,14 @@ public class User {
      */
     public void setFavoriteCount(Long favoriteCount) {
         this.favoriteCount = favoriteCount;
+    }
+
+    public Long getCollectCount() {
+        return collectCount;
+    }
+
+    public void setCollectCount(Long collectCount) {
+        this.collectCount = collectCount;
     }
 
     /**

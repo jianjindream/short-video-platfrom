@@ -33,9 +33,24 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=root@2023
     volumes:
+      - ./deploy/mysql/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf
       - ./deploy/mysql/initdb/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "3306:3306"
+    networks:
+      - ticktock-net
+  canal-server:
+    image: canal/canal-server:v1.1.8
+    restart: on-failure
+    depends_on:
+      - ticktock-db
+    ports:
+      - "11111:11111"
+    environment:
+      - canal.instance.master.address=ticktock-db:3306
+      - canal.instance.dbUsername=canal
+      - canal.instance.dbPassword=canal
+      - canal.instance.filter.regex=camps_tiktok.t_outbox
     networks:
       - ticktock-net
   redis:
@@ -101,6 +116,7 @@ services:
       - nacos
       - redis
       - kafka
+      - canal-server
     networks:
       - ticktock-net
   user:

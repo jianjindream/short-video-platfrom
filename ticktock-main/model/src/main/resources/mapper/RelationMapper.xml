@@ -1,12 +1,56 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
-<mapper namespace="fun.witt.mapper.RelationMapper" >
-  <resultMap id="BaseResultMap" type="fun.witt.model.Relation" >
-    <!--
-      WARNING - @mbg.generated
-    -->
-    <id column="id" property="id" jdbcType="BIGINT" />
-    <result column="follow_id" property="followId" jdbcType="BIGINT" />
-    <result column="follower_id" property="followerId" jdbcType="BIGINT" />
-  </resultMap>
+<mapper namespace="fun.witt.mapper.RelationMapper">
+    <resultMap id="BaseResultMap" type="fun.witt.model.Relation">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="follow_id" property="followId" jdbcType="BIGINT"/>
+        <result column="follower_id" property="followerId" jdbcType="BIGINT"/>
+        <result column="created_at" property="createdAt" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO t_relation (follow_id, follower_id, created_at)
+        VALUES (#{followId}, #{followerId}, NOW())
+    </insert>
+
+    <delete id="deleteByUsers">
+        DELETE FROM t_relation
+        WHERE follow_id = #{followId}
+          AND follower_id = #{followerId}
+    </delete>
+
+    <select id="existsByUsers" resultType="int">
+        SELECT COUNT(1)
+        FROM t_relation
+        WHERE follow_id = #{followId}
+          AND follower_id = #{followerId}
+    </select>
+
+    <select id="listFollowingRows" resultMap="BaseResultMap">
+        SELECT id, follow_id, follower_id, created_at
+        FROM t_relation
+        WHERE follower_id = #{followerId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="listFollowerRows" resultMap="BaseResultMap">
+        SELECT id, follow_id, follower_id, created_at
+        FROM t_relation
+        WHERE follow_id = #{followId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countFollowingActive" resultType="long">
+        SELECT COUNT(1)
+        FROM t_relation
+        WHERE follower_id = #{followerId}
+    </select>
+
+    <select id="countFollowerActive" resultType="long">
+        SELECT COUNT(1)
+        FROM t_relation
+        WHERE follow_id = #{followId}
+    </select>
 </mapper>

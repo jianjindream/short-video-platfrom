@@ -34,7 +34,7 @@ public class FavoriteFeignClientImpl implements FavoriteFeignClient {
     }
 
     @Override
-    public List<Long> listUserFavoriteVideo(long userID) {
+    public List<Long> listUserFavoriteVideo(@RequestParam("userID") long userID) {
         Example example = new Example(Favorite.class);
         Example.Criteria criteria = example.createCriteria();
         criteria.andEqualTo("userId", userID);

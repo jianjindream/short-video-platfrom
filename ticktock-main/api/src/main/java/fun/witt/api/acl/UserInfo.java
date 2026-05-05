@@ -20,4 +20,5 @@ public class UserInfo {
     private String signature;//个性签名
     private long totalFavorite;
     private long favoriteCount;
+    private long collectCount;
 }

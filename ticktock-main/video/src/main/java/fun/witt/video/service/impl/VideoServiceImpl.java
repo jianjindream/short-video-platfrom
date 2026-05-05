@@ -4,11 +4,13 @@ import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.IdUtil;
 import fun.witt.api.feign.FavoriteFeignClient;
+import fun.witt.api.feign.CollectFeignClient;
 import fun.witt.api.feign.UserFeignClient;
 import fun.witt.api.utils.ConvertUtil;
 import fun.witt.api.vo.ResultVO;
 import fun.witt.api.vo.VideoExt;
 import fun.witt.api.vo.VideoListVO;
+import fun.witt.common.service.CounterService;
 import fun.witt.common.template.MinioTemplate;
 import fun.witt.mapper.VideoMapper;
 import fun.witt.model.Video;
@@ -38,6 +40,12 @@ public class VideoServiceImpl implements VideoService {
 
     @Autowired
     private FavoriteFeignClient favoriteFeignClient;
+
+    @Autowired
+    private CollectFeignClient collectFeignClient;
+
+    @Autowired
+    private CounterService counterService;
 
     @Override
     public ResultVO publish(long userID, String title, MultipartFile file) {
@@ -128,9 +136,29 @@ public class VideoServiceImpl implements VideoService {
         return vo;
     }
 
+    @Override
+    public VideoListVO listCollectVideo(long userID, long loginUserID) {
+        List<Long> videoIDList = collectFeignClient.listUserCollectVideo(userID);
+        if (videoIDList.isEmpty()) {
+            return new VideoListVO();
+        }
+
+        Example example = new Example(Video.class);
+        Example.Criteria criteria = example.createCriteria();
+        criteria.andIn("id", videoIDList);
+        List<Video> videoList = videoMapper.selectByExample(example);
+        List<VideoExt> videoExtList = convertVideoExtList(videoList, loginUserID);
+        VideoListVO vo = new VideoListVO();
+        vo.setVideoList(videoExtList);
+        return vo;
+    }
+
     private List<VideoExt> convertVideoExtList(List<Video> videoList, long loginUserID) {
         List<Long> videoIDList = videoList.parallelStream().map(Video::getId).collect(Collectors.toList());
         Map<Long, Boolean> favoriteStateDict = favoriteFeignClient.batchFavoriteState(videoIDList, loginUserID);
+        Map<Long, Boolean> collectStateDict = collectFeignClient.batchCollectState(videoIDList, loginUserID);
+        Map<Long, Long> favoriteCountDict = counterService.getVideoLikeCounts(videoIDList);
+        Map<Long, Long> collectCountDict = counterService.getVideoCollectCounts(videoIDList);
 
         return videoList.parallelStream()
                 .map(video -> {
@@ -140,6 +168,15 @@ public class VideoServiceImpl implements VideoService {
                     videoExt.setCoverUrl(minioTemplate.getObjectUrl(video.getCoverUrl()));
                     videoExt.setAuthor(userFeignClient.getUserInfo(video.getAuthorId(), loginUserID));
                     videoExt.setFavorite(favoriteStateDict.getOrDefault(video.getId(), false));
+                    videoExt.setCollect(collectStateDict.getOrDefault(video.getId(), false));
+                    Long redisFavoriteCount = favoriteCountDict.get(video.getId());
+                    if (redisFavoriteCount != null && (redisFavoriteCount > 0 || video.getFavoriteCount() == null || video.getFavoriteCount() == 0)) {
+                        videoExt.setFavoriteCount(redisFavoriteCount);
+                    }
+                    Long redisCollectCount = collectCountDict.get(video.getId());
+                    if (redisCollectCount != null) {
+                        videoExt.setCollectCount(redisCollectCount);
+                    }
                     return videoExt;
                 })
                 .collect(Collectors.toList());

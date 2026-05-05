@@ -14,4 +14,6 @@ public interface VideoService {
 
     VideoListVO listFavoriteVideo(long userID, long loginUserID);
 
+    VideoListVO listCollectVideo(long userID, long loginUserID);
+
 }

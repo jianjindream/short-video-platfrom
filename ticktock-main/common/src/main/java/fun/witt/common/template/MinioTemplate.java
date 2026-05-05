@@ -1,13 +1,24 @@
 package fun.witt.common.template;
 
-import io.minio.*;
+import io.minio.ComposeObjectArgs;
+import io.minio.ComposeSource;
+import io.minio.GetObjectArgs;
+import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.ListObjectsArgs;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
+import io.minio.Result;
+import io.minio.StatObjectArgs;
 import io.minio.http.Method;
+import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -56,7 +67,7 @@ public class MinioTemplate {
                             .build()
             );
         } catch (Exception e) {
-            log.error("minio上传文件错误：", e);
+            log.error("minio上传文件错误", e);
         }
     }
 
@@ -93,7 +104,7 @@ public class MinioTemplate {
                             .build()
             );
         } catch (Exception e) {
-            log.error("minio合并分片错误：", e);
+            log.error("minio合并分片错误", e);
             throw new RuntimeException("分片合并失败", e);
         }
     }
@@ -101,18 +112,48 @@ public class MinioTemplate {
     /**
      * 批量删除对象
      */
-    public void removeObjects(List<String> objectNames) {
+    public boolean removeObjects(List<String> objectNames) {
+        boolean success = true;
         for (String name : objectNames) {
             try {
                 removeObject(name);
             } catch (Exception e) {
                 log.warn("删除临时分片 {} 失败：{}", name, e.getMessage());
+                success = false;
             }
         }
+        return success;
     }
 
     /**
-     * 获取对象输入流（用于读取已上传的文件）
+     * 删除指定前缀下的所有对象
+     */
+    public boolean removeObjectsByPrefix(String prefix) {
+        try {
+            return removeObjects(listObjectNamesByPrefix(prefix));
+        } catch (Exception e) {
+            log.warn("删除前缀 {} 下的对象失败：{}", prefix, e.getMessage());
+            return false;
+        }
+    }
+
+    public List<String> listObjectNamesByPrefix(String prefix) throws Exception {
+        List<String> objectNames = new ArrayList<>();
+        Iterable<Result<Item>> results = minioClient.listObjects(
+                ListObjectsArgs.builder()
+                        .bucket(bucket)
+                        .prefix(prefix)
+                        .recursive(true)
+                        .build()
+        );
+        for (Result<Item> result : results) {
+            objectNames.add(result.get().objectName());
+        }
+        return objectNames;
+    }
+
+    /**
+     * 获取对象输入流
      */
     public InputStream getObjectStream(String objectName) throws Exception {
         return minioClient.getObject(

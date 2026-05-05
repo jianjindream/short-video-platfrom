@@ -1,8 +1,8 @@
 server:
-  #  port: ${random.int(5000,8000)}
   port: 8001
   servlet:
     context-path: /douyin
+
 spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
@@ -15,13 +15,13 @@ spring:
     username: root
     password: root@2023
     hikari:
-      connection-timeout: 30000               # 等待连接池分配连接的最大时间（毫秒），超过这个时长还没有可用的连接，则会抛出SQLException
-      minimum-idle: 5                         # 最小连接数
-      maximum-pool-size: 20                   # 最大连接数
-      auto-commit: true                       # 自动提交
-      idle-timeout: 600000                    # 连接超时的最大时长（毫秒），超时则会被释放（retired）
-      pool-name: DataSourceHikariCP           # 连接池的名字
-      max-lifetime: 18000000                  # 连接池的最大生命时长（毫秒），超时则会被释放（retired）
+      connection-timeout: 30000
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 600000
+      pool-name: DataSourceHikariCP
+      max-lifetime: 18000000
       connection-test-query: SELECT 1
   cloud:
     nacos:
@@ -42,23 +42,15 @@ jwt:
   access-token-validity-ms: 1800000
   refresh-token-validity-ms: 604800000
 
-# 整合mybatis
 mybatis:
-  type-aliases-package: fun.witt.model        # 所有pojo类所在的包路径
-  mapper-locations: classpath:mapper/*.xml    # mapper映射文件
+  type-aliases-package: fun.witt.model
+  mapper-locations: classpath:mapper/*.xml
 
-# 通用mapper工具的配置
 mapper:
-  mappers: fun.witt.utils.MyMapper           # 配置MyMapper，包含了一些封装好的CRUD方法
-  not-empty: false                            # 在进行数据库操作的时候，username != null 是否会追加 username != ''
+  mappers: fun.witt.utils.MyMapper
+  not-empty: false
   identity: MYSQL
 
-# 分页插件助手的配置
-#pagehelper:
-#  helper-dialect: MYSQL
-#  support-methods-arguments: true
-
-# 日志级别
 logging:
   level:
     root: info

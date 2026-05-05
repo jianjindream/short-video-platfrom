@@ -9,12 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-/**
- * 点赞事件 Kafka 生产者。
- * 配置 acks=all + 微批处理 (batch.size, linger.ms)。
- * 以 feedId 作为 Hash Key 路由，保证同一视频的事件有序。
- */
 @Slf4j
 @Component
 public class LikeEventProducer {
@@ -24,10 +20,11 @@ public class LikeEventProducer {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public void sendLikeEvent(long feedId, long userId, long authorId, String action, int delta) {
+    public boolean sendLikeEvent(String eventId, long videoId, long userId, long authorId, String action, int delta) {
         try {
             Map<String, Object> event = new HashMap<>(8);
-            event.put("feedId", feedId);
+            event.put("eventId", eventId);
+            event.put("videoId", videoId);
             event.put("userId", userId);
             event.put("authorId", authorId);
             event.put("action", action);
@@ -35,10 +32,12 @@ public class LikeEventProducer {
             event.put("timestamp", System.currentTimeMillis());
 
             String json = objectMapper.writeValueAsString(event);
-            String key = String.valueOf(feedId);
-            kafkaTemplate.send(Constant.TOPIC_LIKE_EVENTS, key, json);
+            kafkaTemplate.send(Constant.TOPIC_LIKE_EVENTS, String.valueOf(videoId), json)
+                    .get(5, TimeUnit.SECONDS);
+            return true;
         } catch (Exception e) {
-            log.error("发送点赞事件到 Kafka 失败, feedId={}, userId={}", feedId, userId, e);
+            log.error("send like event failed, videoId={}, userId={}", videoId, userId, e);
+            return false;
         }
     }
 }

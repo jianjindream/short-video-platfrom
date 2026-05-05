@@ -17,6 +17,9 @@ public class ConvertUtil {
         userExt.setName(user.getUserName());
         userExt.setFollowCount(user.getFollowCount());
         userExt.setFollowerCount(user.getFollowerCount());
+        userExt.setTotalFavorited(user.getTotalFavorited() == null ? 0L : user.getTotalFavorited());
+        userExt.setFavoriteCount(user.getFavoriteCount() == null ? 0L : user.getFavoriteCount());
+        userExt.setCollectCount(user.getCollectCount() == null ? 0L : user.getCollectCount());
         return userExt;
     }
 
@@ -28,6 +31,7 @@ public class ConvertUtil {
         videoExt.setPlayUrl(video.getPlayUrl());
         videoExt.setFavoriteCount(video.getFavoriteCount());
         videoExt.setCommentCount(video.getCommentCount());
+        videoExt.setCollectCount(0L);
         return videoExt;
     }
 

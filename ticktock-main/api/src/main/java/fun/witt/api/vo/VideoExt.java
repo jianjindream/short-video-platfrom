@@ -9,7 +9,9 @@ public class VideoExt {
     private String coverUrl;
     private String playUrl;
     private long favoriteCount;
+    private long collectCount;
     private long commentCount;
     private boolean isFavorite;
+    private boolean isCollect;
     private UserExt author;
 }

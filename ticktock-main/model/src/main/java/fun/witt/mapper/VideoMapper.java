@@ -9,4 +9,6 @@ import java.util.List;
 
 public interface VideoMapper extends MyMapper<Video> {
     List<Video> queryVideoOrderByLatestTime(@Param("latestTime") Date latestTime, @Param("count") int count);
+
+    Long selectAuthorId(@Param("videoId") Long videoId);
 }

@@ -5,6 +5,7 @@ import fun.witt.api.feign.RelationFeignClient;
 import fun.witt.api.utils.ConvertUtil;
 import fun.witt.api.vo.UserExt;
 import fun.witt.common.service.CounterService;
+import fun.witt.mapper.CollectMapper;
 import fun.witt.mapper.UserMapper;
 import fun.witt.model.User;
 import fun.witt.user.service.UserService;
@@ -28,6 +29,9 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private CounterService counterService;
 
+    @Autowired
+    private CollectMapper collectMapper;
+
     @Override
     public User queryNameIsExist(String name) {
         Example userExample = new Example(User.class);
@@ -46,6 +50,7 @@ public class UserServiceImpl implements UserService {
         user.setFollowerCount(0L);
         user.setTotalFavorited(0L);
         user.setFavoriteCount(0L);
+        user.setCollectCount(0L);
         user.setSignature("default sign");
         user.setAvatar("https://tse1-mm.cn.bing.net/th/id/R-C.d83ded12079fa9e407e9928b8f300802?rik=Gzu6EnSylX9f1Q&riu=http%3a%2f%2fwww.webcarpenter.com%2fpictures%2fGo-gopher-programming-language.jpg&ehk=giVQvdvQiENrabreHFM8x%2fyOU70l%2fy6FOa6RS3viJ24%3d&risl=&pid=ImgRaw&r=0");
         user.setBackgroundImage("https://tse2-mm.cn.bing.net/th/id/OIP-C.sDoybxmH4DIpvO33-wQEPgHaEq?pid=ImgDet&rs=1");
@@ -60,6 +65,7 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         UserExt userExt = ConvertUtil.convertUser(user);
+        userExt.setCollectCount(collectMapper.countByUser(userID));
 
         // 从 Redis BITFIELD 读取实时计数，替代 MySQL 中的冗余计数字段
         enrichWithRedisCounters(userExt, userID);
@@ -82,6 +88,7 @@ public class UserServiceImpl implements UserService {
 
         return userList.stream().map(user -> {
             UserExt userExt = ConvertUtil.convertUser(user);
+            userExt.setCollectCount(collectMapper.countByUser(user.getId()));
             enrichWithRedisCounters(userExt, user.getId());
             if (loginUserID > 0) {
                 userExt.setFollow(feignClient.followState(user.getId(), loginUserID));
@@ -100,10 +107,13 @@ public class UserServiceImpl implements UserService {
             long followCount = counters[0];
             long followerCount = counters[1];
             long favoritedCount = counters[2];
+            long favoriteCount = counters.length > 3 ? counters[3] : 0;
 
-            if (followCount > 0 || followerCount > 0 || favoritedCount > 0) {
+            if (followCount > 0 || followerCount > 0 || favoritedCount > 0 || favoriteCount > 0) {
                 userExt.setFollowCount(followCount);
                 userExt.setFollowerCount(followerCount);
+                userExt.setTotalFavorited(favoritedCount);
+                userExt.setFavoriteCount(favoriteCount);
             }
         } catch (Exception e) {
             // Redis 不可用时降级，使用 MySQL 的值（已在 ConvertUtil 中设置）

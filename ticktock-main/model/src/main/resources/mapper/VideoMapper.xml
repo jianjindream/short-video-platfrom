@@ -29,4 +29,11 @@
         order by publish_time desc
         limit #{count}
     </select>
+
+    <select id="selectAuthorId" resultType="long">
+        select author_id
+        from t_video
+        where id = #{videoId}
+        limit 1
+    </select>
 </mapper>

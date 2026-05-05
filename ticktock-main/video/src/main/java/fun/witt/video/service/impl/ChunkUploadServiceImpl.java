@@ -9,6 +9,7 @@ import fun.witt.common.template.MinioTemplate;
 import fun.witt.mapper.VideoMapper;
 import fun.witt.model.Video;
 import fun.witt.video.service.ChunkUploadService;
+import fun.witt.video.support.ChunkUploadConstants;
 import fun.witt.video.utils.FfmpegUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -28,10 +33,6 @@ import java.util.stream.IntStream;
 public class ChunkUploadServiceImpl implements ChunkUploadService {
 
     private static final String NORM_DAY_PATTERN = "yyyy-MM-dd";
-    private static final String UPLOAD_META_PREFIX = "chunk_upload:";
-    private static final String UPLOAD_PARTS_PREFIX = "chunk_upload_parts:";
-    private static final String CHUNK_TMP_PREFIX = "tmp/";
-    private static final long UPLOAD_EXPIRE_HOURS = 24;
 
     @Value("${minio.chunk-size:5242880}")
     private long chunkSize;
@@ -60,24 +61,26 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
 
         String ext = fileName.substring(fileName.lastIndexOf("."));
         String objectName = DateUtil.format(new Date(), NORM_DAY_PATTERN) + "/" + IdUtil.simpleUUID() + ext;
+        long now = System.currentTimeMillis();
 
-        Map<String, String> meta = new HashMap<>();
-        meta.put("userId", String.valueOf(userId));
-        meta.put("fileName", fileName);
-        meta.put("fileSize", String.valueOf(fileSize));
-        meta.put("objectName", objectName);
-        meta.put("title", title);
-        meta.put("chunkCount", String.valueOf(chunkCount));
-        meta.put("chunkSize", String.valueOf(chunkSize));
-        meta.put("status", "UPLOADING");
-        meta.put("createdAt", String.valueOf(System.currentTimeMillis()));
+        Map<String, String> meta = new HashMap<String, String>();
+        meta.put(ChunkUploadConstants.META_FIELD_USER_ID, String.valueOf(userId));
+        meta.put(ChunkUploadConstants.META_FIELD_FILE_NAME, fileName);
+        meta.put(ChunkUploadConstants.META_FIELD_FILE_SIZE, String.valueOf(fileSize));
+        meta.put(ChunkUploadConstants.META_FIELD_OBJECT_NAME, objectName);
+        meta.put(ChunkUploadConstants.META_FIELD_TITLE, title);
+        meta.put(ChunkUploadConstants.META_FIELD_CHUNK_COUNT, String.valueOf(chunkCount));
+        meta.put(ChunkUploadConstants.META_FIELD_CHUNK_SIZE, String.valueOf(chunkSize));
+        meta.put(ChunkUploadConstants.META_FIELD_STATUS, ChunkUploadConstants.STATUS_UPLOADING);
+        meta.put(ChunkUploadConstants.META_FIELD_CREATED_AT, String.valueOf(now));
+        meta.put(ChunkUploadConstants.META_FIELD_LAST_CHUNK_AT, String.valueOf(now));
 
-        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        String metaKey = ChunkUploadConstants.UPLOAD_META_PREFIX + uploadId;
         redisTemplate.opsForHash().putAll(metaKey, meta);
-        redisTemplate.expire(metaKey, UPLOAD_EXPIRE_HOURS, TimeUnit.HOURS);
+        redisTemplate.expire(metaKey, ChunkUploadConstants.UPLOAD_META_TTL_HOURS, TimeUnit.HOURS);
 
-        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
-        redisTemplate.expire(partsKey, UPLOAD_EXPIRE_HOURS, TimeUnit.HOURS);
+        String partsKey = ChunkUploadConstants.UPLOAD_PARTS_PREFIX + uploadId;
+        redisTemplate.expire(partsKey, ChunkUploadConstants.UPLOAD_META_TTL_HOURS, TimeUnit.HOURS);
 
         vo.setStatusCode(0);
         vo.setStatusMsg("success");
@@ -89,23 +92,23 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
 
     @Override
     public ResultVO uploadChunk(String uploadId, int chunkNumber, MultipartFile file) {
-        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        String metaKey = ChunkUploadConstants.UPLOAD_META_PREFIX + uploadId;
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
         if (meta.isEmpty()) {
             return ResultVO.fail("上传任务不存在或已过期");
         }
 
-        String status = (String) meta.get("status");
-        if (!"UPLOADING".equals(status)) {
+        String status = stringValue(meta.get(ChunkUploadConstants.META_FIELD_STATUS));
+        if (!ChunkUploadConstants.STATUS_UPLOADING.equals(status)) {
             return ResultVO.fail("上传任务状态异常：" + status);
         }
 
-        int chunkCount = Integer.parseInt((String) meta.get("chunkCount"));
+        int chunkCount = Integer.parseInt(stringValue(meta.get(ChunkUploadConstants.META_FIELD_CHUNK_COUNT)));
         if (chunkNumber < 1 || chunkNumber > chunkCount) {
             return ResultVO.fail("分片编号超出范围：1~" + chunkCount);
         }
 
-        String chunkObjectName = CHUNK_TMP_PREFIX + uploadId + "/" + chunkNumber;
+        String chunkObjectName = ChunkUploadConstants.CHUNK_TMP_PREFIX + uploadId + "/" + chunkNumber;
         try {
             minioTemplate.uploadChunk(file.getBytes(), chunkObjectName, file.getContentType());
         } catch (IOException e) {
@@ -113,38 +116,42 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             return ResultVO.fail("分片上传失败");
         }
 
-        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        long now = System.currentTimeMillis();
+        String partsKey = ChunkUploadConstants.UPLOAD_PARTS_PREFIX + uploadId;
         redisTemplate.opsForHash().put(partsKey, String.valueOf(chunkNumber), "1");
+        redisTemplate.opsForHash().put(metaKey, ChunkUploadConstants.META_FIELD_LAST_CHUNK_AT, String.valueOf(now));
+        redisTemplate.expire(metaKey, ChunkUploadConstants.UPLOAD_META_TTL_HOURS, TimeUnit.HOURS);
+        redisTemplate.expire(partsKey, ChunkUploadConstants.UPLOAD_META_TTL_HOURS, TimeUnit.HOURS);
 
         return ResultVO.ok();
     }
 
     @Override
     public ResultVO completeUpload(long userId, String uploadId) {
-        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        String metaKey = ChunkUploadConstants.UPLOAD_META_PREFIX + uploadId;
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
         if (meta.isEmpty()) {
             return ResultVO.fail("上传任务不存在或已过期");
         }
 
-        String status = (String) meta.get("status");
-        if ("COMPLETED".equals(status)) {
+        String status = stringValue(meta.get(ChunkUploadConstants.META_FIELD_STATUS));
+        if (ChunkUploadConstants.STATUS_COMPLETED.equals(status)) {
             return ResultVO.ok();
         }
-        if (!"UPLOADING".equals(status)) {
+        if (!ChunkUploadConstants.STATUS_UPLOADING.equals(status)) {
             return ResultVO.fail("上传任务状态异常：" + status);
         }
 
-        long metaUserId = Long.parseLong((String) meta.get("userId"));
+        long metaUserId = Long.parseLong(stringValue(meta.get(ChunkUploadConstants.META_FIELD_USER_ID)));
         if (metaUserId != userId) {
             return ResultVO.fail("无权操作此上传任务");
         }
 
-        int chunkCount = Integer.parseInt((String) meta.get("chunkCount"));
-        String objectName = (String) meta.get("objectName");
-        String title = (String) meta.get("title");
+        int chunkCount = Integer.parseInt(stringValue(meta.get(ChunkUploadConstants.META_FIELD_CHUNK_COUNT)));
+        String objectName = stringValue(meta.get(ChunkUploadConstants.META_FIELD_OBJECT_NAME));
+        String title = stringValue(meta.get(ChunkUploadConstants.META_FIELD_TITLE));
 
-        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        String partsKey = ChunkUploadConstants.UPLOAD_PARTS_PREFIX + uploadId;
         Set<Object> uploadedParts = redisTemplate.opsForHash().keys(partsKey);
         if (uploadedParts.size() < chunkCount) {
             List<Integer> missing = IntStream.rangeClosed(1, chunkCount)
@@ -155,7 +162,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         }
 
         List<String> sourceObjectNames = IntStream.rangeClosed(1, chunkCount)
-                .mapToObj(i -> CHUNK_TMP_PREFIX + uploadId + "/" + i)
+                .mapToObj(i -> ChunkUploadConstants.CHUNK_TMP_PREFIX + uploadId + "/" + i)
                 .collect(Collectors.toList());
 
         try {
@@ -192,8 +199,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             return ResultVO.fail("视频记录保存失败");
         }
 
-        redisTemplate.opsForHash().put(metaKey, "status", "COMPLETED");
-
+        redisTemplate.opsForHash().put(metaKey, ChunkUploadConstants.META_FIELD_STATUS, ChunkUploadConstants.STATUS_COMPLETED);
         minioTemplate.removeObjects(sourceObjectNames);
 
         return ResultVO.ok();
@@ -203,7 +209,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
     public UploadProgressVO getUploadProgress(String uploadId) {
         UploadProgressVO vo = new UploadProgressVO();
 
-        String metaKey = UPLOAD_META_PREFIX + uploadId;
+        String metaKey = ChunkUploadConstants.UPLOAD_META_PREFIX + uploadId;
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
         if (meta.isEmpty()) {
             vo.setStatusCode(1);
@@ -211,10 +217,10 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             return vo;
         }
 
-        int chunkCount = Integer.parseInt((String) meta.get("chunkCount"));
-        String status = (String) meta.get("status");
+        int chunkCount = Integer.parseInt(stringValue(meta.get(ChunkUploadConstants.META_FIELD_CHUNK_COUNT)));
+        String status = stringValue(meta.get(ChunkUploadConstants.META_FIELD_STATUS));
 
-        String partsKey = UPLOAD_PARTS_PREFIX + uploadId;
+        String partsKey = ChunkUploadConstants.UPLOAD_PARTS_PREFIX + uploadId;
         Set<Object> uploadedParts = redisTemplate.opsForHash().keys(partsKey);
         List<Integer> uploadedChunkList = uploadedParts.stream()
                 .map(o -> Integer.parseInt(o.toString()))
@@ -228,5 +234,9 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         vo.setUploadedChunks(uploadedChunkList);
         vo.setStatus(status);
         return vo;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : value.toString();
     }
 }

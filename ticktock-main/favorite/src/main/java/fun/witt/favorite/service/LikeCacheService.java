@@ -1,69 +1,91 @@
 package fun.witt.favorite.service;
 
 import fun.witt.constant.Constant;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-/**
- * 点赞状态缓存服务：基于 Redis Bitmap 实现极速读写。
- * Key 格式: feed:{feedId}:likes，使用 userId 作为 offset。
- */
-@Slf4j
+import java.util.Collections;
+
 @Service
 public class LikeCacheService {
 
+    private final StringRedisTemplate redisTemplate;
+    private final DefaultRedisScript<Long> toggleScript;
+
     @Autowired
-    private StringRedisTemplate redisTemplate;
-
-    public void setLiked(long feedId, long userId) {
-        String key = String.format(Constant.REDIS_FEED_LIKES, feedId);
-        redisTemplate.opsForValue().setBit(key, userId, true);
+    public LikeCacheService(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+        this.toggleScript = new DefaultRedisScript<>();
+        this.toggleScript.setResultType(Long.class);
+        this.toggleScript.setScriptText(TOGGLE_LUA);
     }
 
-    public void setUnliked(long feedId, long userId) {
-        String key = String.format(Constant.REDIS_FEED_LIKES, feedId);
-        redisTemplate.opsForValue().setBit(key, userId, false);
+    public boolean setLiked(long videoId, long userId) {
+        return toggle(videoId, userId, true);
     }
 
-    public boolean isLiked(long feedId, long userId) {
-        String key = String.format(Constant.REDIS_FEED_LIKES, feedId);
-        Boolean bit = redisTemplate.opsForValue().getBit(key, userId);
+    public boolean setUnliked(long videoId, long userId) {
+        return toggle(videoId, userId, false);
+    }
+
+    public boolean isLiked(long videoId, long userId) {
+        String key = bitmapKey(videoId, userId);
+        Boolean bit = redisTemplate.opsForValue().getBit(key, bitOf(userId));
         return Boolean.TRUE.equals(bit);
     }
 
-    /**
-     * 写入点赞增量到 Redis 聚合桶
-     * agg:like:feed:{feedId}:{timeSlot} HINCRBY like delta
-     * active:{timeSlot} SADD aggKey
-     */
-    public void writeAggregationDelta(long feedId, int delta) {
+    public void writeAggregationDelta(long videoId, int delta) {
         long timeSlot = System.currentTimeMillis() / 3600000;
-        String aggKey = String.format(Constant.REDIS_AGG_LIKE, feedId, timeSlot);
-        String activeKey = String.format(Constant.REDIS_ACTIVE_SET, timeSlot);
+        String aggKey = String.format(Constant.REDIS_AGG_VIDEO_LIKE, videoId, timeSlot);
+        String activeKey = String.format(Constant.REDIS_ACTIVE_VIDEO_SET, timeSlot);
 
         redisTemplate.opsForHash().increment(aggKey, "like", delta);
         redisTemplate.opsForSet().add(activeKey, aggKey);
     }
 
-    /**
-     * 写入用户级计数增量到聚合桶（用于 BITFIELD 计数器）
-     * - liker 的 favorite_count +/- delta
-     * - author 的 total_favorited +/- delta
-     */
     public void writeUserCountDelta(long likerId, long authorId, int delta) {
         long timeSlot = System.currentTimeMillis() / 3600000;
-        String activeKey = String.format(Constant.REDIS_ACTIVE_SET, timeSlot);
+        String activeKey = String.format(Constant.REDIS_ACTIVE_USER_SET, timeSlot);
 
-        // 点赞用户的"我喜欢"计数
-        String likerAggKey = String.format("agg:ucount:%d:%d", likerId, timeSlot);
-        redisTemplate.opsForHash().increment(likerAggKey, "favorited_count", delta);
+        String likerAggKey = String.format(Constant.REDIS_AGG_USER_COUNT, likerId, timeSlot);
+        redisTemplate.opsForHash().increment(likerAggKey, "favorite_count", delta);
         redisTemplate.opsForSet().add(activeKey, likerAggKey);
 
-        // 视频作者的"获赞"计数
-        String authorAggKey = String.format("agg:ucount:%d:%d", authorId, timeSlot);
-        redisTemplate.opsForHash().increment(authorAggKey, "total_favorited", delta);
-        redisTemplate.opsForSet().add(activeKey, authorAggKey);
+        if (authorId > 0) {
+            String authorAggKey = String.format(Constant.REDIS_AGG_USER_COUNT, authorId, timeSlot);
+            redisTemplate.opsForHash().increment(authorAggKey, "total_favorited", delta);
+            redisTemplate.opsForSet().add(activeKey, authorAggKey);
+        }
     }
+
+    private boolean toggle(long videoId, long userId, boolean liked) {
+        Long changed = redisTemplate.execute(toggleScript,
+                Collections.singletonList(bitmapKey(videoId, userId)),
+                String.valueOf(bitOf(userId)),
+                liked ? "1" : "0");
+        return changed != null && changed == 1L;
+    }
+
+    private String bitmapKey(long videoId, long userId) {
+        return String.format(Constant.REDIS_VIDEO_LIKE_BITMAP, videoId, chunkOf(userId));
+    }
+
+    private long chunkOf(long userId) {
+        return userId / Constant.BITMAP_CHUNK_SIZE;
+    }
+
+    private long bitOf(long userId) {
+        return userId % Constant.BITMAP_CHUNK_SIZE;
+    }
+
+    private static final String TOGGLE_LUA =
+            "local bmKey = KEYS[1]\n" +
+            "local offset = tonumber(ARGV[1])\n" +
+            "local desired = tonumber(ARGV[2])\n" +
+            "local prev = redis.call('GETBIT', bmKey, offset)\n" +
+            "if prev == desired then return 0 end\n" +
+            "redis.call('SETBIT', bmKey, offset, desired)\n" +
+            "return 1\n";
 }

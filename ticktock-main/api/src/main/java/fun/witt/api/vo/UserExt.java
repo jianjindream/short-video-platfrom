@@ -8,5 +8,8 @@ public class UserExt {
     private String name;
     private long followCount;
     private long followerCount;
+    private long totalFavorited;
+    private long favoriteCount;
+    private long collectCount;
     private boolean isFollow;
 }

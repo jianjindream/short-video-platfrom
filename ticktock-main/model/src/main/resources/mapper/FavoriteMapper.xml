@@ -9,4 +9,34 @@
     <result column="user_id" property="userId" jdbcType="BIGINT" />
     <result column="video_id" property="videoId" jdbcType="BIGINT" />
   </resultMap>
+
+  <insert id="insertIgnore">
+    INSERT IGNORE INTO t_favorite (user_id, video_id)
+    VALUES (#{userId}, #{videoId})
+  </insert>
+
+  <delete id="deleteByUserAndVideo">
+    DELETE FROM t_favorite
+    WHERE user_id = #{userId}
+      AND video_id = #{videoId}
+  </delete>
+
+  <select id="countByUser" resultType="long">
+    SELECT COUNT(1)
+    FROM t_favorite
+    WHERE user_id = #{userId}
+  </select>
+
+  <select id="countByVideo" resultType="long">
+    SELECT COUNT(1)
+    FROM t_favorite
+    WHERE video_id = #{videoId}
+  </select>
+
+  <select id="countReceivedByAuthor" resultType="long">
+    SELECT COUNT(1)
+    FROM t_favorite f
+    INNER JOIN t_video v ON v.id = f.video_id
+    WHERE v.author_id = #{authorId}
+  </select>
 </mapper>

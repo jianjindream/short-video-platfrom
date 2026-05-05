@@ -45,7 +45,7 @@ public class CounterFlushTask {
     }
 
     private void flushSlot(long timeSlot) {
-        String activeKey = String.format(Constant.REDIS_ACTIVE_SET, timeSlot);
+        String activeKey = String.format(Constant.REDIS_ACTIVE_USER_SET, timeSlot);
         Set<String> aggKeys = redisTemplate.opsForSet().members(activeKey);
         if (aggKeys == null || aggKeys.isEmpty()) {
             return;
@@ -60,11 +60,13 @@ public class CounterFlushTask {
                 }
 
                 Long result = redisTemplate.execute(flushScript, Arrays.asList(aggKey, counterKey));
-                if (result != null && result > 0) {
+                if (result != null) {
                     flushed++;
                 }
 
-                redisTemplate.opsForSet().remove(activeKey, aggKey);
+                if (result != null && result == 0) {
+                    redisTemplate.opsForSet().remove(activeKey, aggKey);
+                }
             } catch (Exception e) {
                 log.error("刷写聚合桶失败: {}", aggKey, e);
             }
@@ -83,7 +85,7 @@ public class CounterFlushTask {
         if (aggKey.startsWith("agg:ucount:")) {
             String[] parts = aggKey.split(":");
             if (parts.length >= 3) {
-                return "ucounter:" + parts[2];
+                return String.format(Constant.REDIS_USER_COUNTER, Long.parseLong(parts[2]));
             }
         }
         return null;

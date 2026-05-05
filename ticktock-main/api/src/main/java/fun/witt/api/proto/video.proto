@@ -9,19 +9,15 @@ option go_package = "../pb;pb";
 import "common.proto";
 
 service VideoService {
-  // 获取视频列表
   rpc GetPublishVideoList(GetPublishVideoListRequest) returns (GetPublishVideoListResponse);
   rpc PublishVideo(PublishVideoRequest) returns (PublishVideoResponse);
   rpc GetFeedList(GetFeedListRequest) returns (GetFeedListResponse);
   rpc GetVideoInfoList(GetVideoInfoListReq) returns (GetVideoInfoListRsp);
   rpc GetFavoriteVideoList(GetFavoriteVideoListReq) returns (GetFavoriteVideoListRsp);
-  // 更新这个视频的获赞数
   rpc UpdateFavoriteCount(UpdateFavoriteCountReq) returns (UpdateFavoriteCountRsp);
-  // 更新这个视频的评论数
   rpc UpdateCommentCount(UpdateCommentCountReq) returns (UpdateCommentCountRsp);
 }
 
-// ******************
 message UpdateFavoriteCountReq {
   int64 video_id = 1;
   int64 action_type = 2;
@@ -30,9 +26,7 @@ message UpdateFavoriteCountReq {
 message UpdateFavoriteCountRsp {
   CommonResponse common_rsp = 1;
 }
-// *******************
 
-// 更新这个视频的评论数
 message UpdateCommentCountReq {
   int64 video_id = 1;
   int64 action_type = 2;
@@ -41,16 +35,14 @@ message UpdateCommentCountReq {
 message UpdateCommentCountRsp {
   CommonResponse common_rsp = 1;
 }
-// *******************
 
 message GetFavoriteVideoListReq {
   int64 user_id = 1;
 }
 
 message GetFavoriteVideoListRsp {
-  repeated VideoInfo video_list = 1; // 用户收藏的视频列表​
+  repeated VideoInfo video_list = 1;
 }
-
 
 message GetPublishVideoListRequest {
   int64 tokenUserId = 1;
@@ -58,7 +50,7 @@ message GetPublishVideoListRequest {
 }
 
 message GetPublishVideoListResponse {
-  repeated VideoInfo video_list = 1; // 用户发布的视频列表​
+  repeated VideoInfo video_list = 1;
 }
 
 message PublishVideoRequest {
@@ -68,7 +60,6 @@ message PublishVideoRequest {
 }
 
 message PublishVideoResponse {
-
 }
 
 message GetFeedListRequest {
@@ -81,16 +72,17 @@ message GetFeedListResponse {
   int64 nextTime = 2;
 }
 
-
 message VideoInfo {
-  int64 id = 1; // 视频唯一标识​
-  int64 author_id = 2; // 视频作者信息
-  string play_url = 3; // 视频播放地址
-  string cover_url = 4; // 视频封面地址​
-  int64 favorite_count = 5; // 视频的点赞总数​
-  int64 comment_count = 6; // 视频的评论总数​
-  bool is_favorite = 7; // true-已点赞，false-未点赞​
-  string title = 8; //视频标题
+  int64 id = 1;
+  int64 author_id = 2;
+  string play_url = 3;
+  string cover_url = 4;
+  int64 favorite_count = 5;
+  int64 comment_count = 6;
+  bool is_favorite = 7;
+  string title = 8;
+  int64 collect_count = 9;
+  bool is_collect = 10;
 }
 
 message GetVideoInfoListReq {

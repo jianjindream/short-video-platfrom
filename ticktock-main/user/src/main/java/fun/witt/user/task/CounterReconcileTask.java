@@ -5,8 +5,6 @@ import fun.witt.constant.Constant;
 import fun.witt.mapper.FavoriteMapper;
 import fun.witt.mapper.RelationMapper;
 import fun.witt.mapper.UserMapper;
-import fun.witt.model.Favorite;
-import fun.witt.model.Relation;
 import fun.witt.model.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,13 +14,6 @@ import tk.mybatis.mapper.entity.Example;
 
 import java.util.List;
 
-/**
- * 兜底自愈：低频巡检对账任务。
- * 定时比对 SDS (BITFIELD) 计数 与 MySQL 物理表 COUNT() 的差异，
- * 出现不一致时以 MySQL 为准覆盖 SDS。
- *
- * 执行频率：每10分钟一次，每次处理一批用户。
- */
 @Slf4j
 @Component
 public class CounterReconcileTask {
@@ -47,7 +38,6 @@ public class CounterReconcileTask {
         Example userExample = new Example(User.class);
         userExample.createCriteria().andGreaterThan("id", lastReconcileUserId);
         userExample.setOrderByClause("id ASC");
-        userExample.setDistinct(false);
 
         List<User> users = userMapper.selectByExample(userExample);
         if (users.isEmpty()) {
@@ -66,10 +56,12 @@ public class CounterReconcileTask {
             long redisFollow = counters[0];
             long redisFollower = counters[1];
             long redisFavorited = counters[2];
+            long redisFavorite = counters.length > 3 ? counters[3] : 0;
 
-            long dbFollow = countFollowing(userId);
-            long dbFollower = countFollowers(userId);
-            long dbFavorited = countTotalFavorited(userId);
+            long dbFollow = relationMapper.countFollowingActive(userId);
+            long dbFollower = relationMapper.countFollowerActive(userId);
+            long dbFavorited = favoriteMapper.countReceivedByAuthor(userId);
+            long dbFavorite = favoriteMapper.countByUser(userId);
 
             boolean needFix = false;
             if (redisFollow != dbFollow) {
@@ -84,39 +76,23 @@ public class CounterReconcileTask {
                 counterService.setCounter(userId, Constant.OFFSET_FAVORITED_COUNT, dbFavorited);
                 needFix = true;
             }
+            if (redisFavorite != dbFavorite) {
+                counterService.setCounter(userId, Constant.OFFSET_FAVORITE_COUNT, dbFavorite);
+                needFix = true;
+            }
 
             if (needFix) {
                 fixed++;
-                log.info("对账修正 userId={}: follow({} -> {}), follower({} -> {}), favorited({} -> {})",
-                        userId, redisFollow, dbFollow, redisFollower, dbFollower, redisFavorited, dbFavorited);
+                log.info("counter reconciled userId={}: follow({} -> {}), follower({} -> {}), favorited({} -> {}), favorite({} -> {})",
+                        userId, redisFollow, dbFollow, redisFollower, dbFollower, redisFavorited, dbFavorited,
+                        redisFavorite, dbFavorite);
             }
 
             lastReconcileUserId = userId;
         }
 
         if (fixed > 0) {
-            log.info("本轮对账修正 {} 个用户计数", fixed);
+            log.info("counter reconcile fixed {} users", fixed);
         }
-    }
-
-    private long countFollowing(long userId) {
-        Example example = new Example(Relation.class);
-        example.createCriteria().andEqualTo("followerId", userId);
-        return relationMapper.selectCountByExample(example);
-    }
-
-    private long countFollowers(long userId) {
-        Example example = new Example(Relation.class);
-        example.createCriteria().andEqualTo("followId", userId);
-        return relationMapper.selectCountByExample(example);
-    }
-
-    private long countTotalFavorited(long userId) {
-        // total_favorited = 该用户所有视频收到的点赞总数
-        // 简化实现：直接从 t_user 表读取（由其他流程维护），
-        // 或统计该用户喜欢的视频数（favorite_count）
-        Example example = new Example(Favorite.class);
-        example.createCriteria().andEqualTo("userId", userId);
-        return favoriteMapper.selectCountByExample(example);
     }
 }

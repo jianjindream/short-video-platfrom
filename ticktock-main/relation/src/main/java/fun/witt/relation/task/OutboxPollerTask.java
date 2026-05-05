@@ -6,10 +6,12 @@ import fun.witt.mapper.OutboxMapper;
 import fun.witt.model.Outbox;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "relation.outbox.poller.enabled", havingValue = "true")
 public class OutboxPollerTask {
 
     private static final int BATCH_SIZE = 100;
@@ -45,10 +48,16 @@ public class OutboxPollerTask {
 
         for (Outbox event : events) {
             try {
+                Map<String, Object> row = new HashMap<>(2);
+                row.put("payload", event.getPayload());
+
+                List<Map<String, Object>> data = new ArrayList<>(1);
+                data.add(row);
+
                 Map<String, Object> message = new HashMap<>(4);
-                message.put("aggregateType", event.getAggregateType());
-                message.put("aggregateId", event.getAggregateId());
-                message.put("payload", event.getPayload());
+                message.put("table", "t_outbox");
+                message.put("type", "INSERT");
+                message.put("data", data);
 
                 String json = objectMapper.writeValueAsString(message);
                 kafkaTemplate.send(Constant.TOPIC_CANAL_OUTBOX, event.getAggregateId(), json).get();

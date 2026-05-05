@@ -12,4 +12,10 @@
         INSERT IGNORE INTO t_follower (from_user_id, to_user_id, created_at)
         VALUES (#{fromUserId}, #{toUserId}, NOW())
     </insert>
+
+    <delete id="deleteByUsers">
+        DELETE FROM t_follower
+        WHERE from_user_id = #{fromUserId}
+          AND to_user_id = #{toUserId}
+    </delete>
 </mapper>

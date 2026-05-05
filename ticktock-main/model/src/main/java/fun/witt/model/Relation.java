@@ -1,6 +1,7 @@
 package fun.witt.model;
 
 import javax.persistence.*;
+import java.util.Date;
 
 @Table(name = "t_relation")
 public class Relation {
@@ -22,6 +23,9 @@ public class Relation {
      */
     @Column(name = "follower_id")
     private Long followerId;
+
+    @Column(name = "created_at")
+    private Date createdAt;
 
     /**
      * 获取自增主键
@@ -75,5 +79,13 @@ public class Relation {
      */
     public void setFollowerId(Long followerId) {
         this.followerId = followerId;
+    }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
     }
 }
