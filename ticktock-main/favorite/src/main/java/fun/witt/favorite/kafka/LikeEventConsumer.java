@@ -21,6 +21,7 @@ public class LikeEventConsumer {
 
     private static final String ACTION_LIKE = "LIKE";
     private static final String ACTION_UNLIKE = "UNLIKE";
+    private static final String CONSUMER_GROUP = "like-aggregation-group";
 
     @Autowired
     private LikeCacheService likeCacheService;
@@ -31,15 +32,19 @@ public class LikeEventConsumer {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    @Autowired
+    private MessageConsumeFailureHandler failureHandler;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @KafkaListener(topics = Constant.TOPIC_LIKE_EVENTS, groupId = "like-aggregation-group")
+    @KafkaListener(topics = Constant.TOPIC_LIKE_EVENTS, groupId = CONSUMER_GROUP)
     public void onMessage(ConsumerRecord<String, String> record, Acknowledgment ack) {
         String dedupKey = null;
         boolean dedupAcquired = false;
+        String eventId = null;
         try {
             JsonNode node = objectMapper.readTree(record.value());
-            String eventId = textValue(node, "eventId");
+            eventId = textValue(node, "eventId");
             long videoId = longValue(node, "videoId", longValue(node, "feedId", 0L));
             long userId = longValue(node, "userId", 0L);
             long authorId = longValue(node, "authorId", 0L);
@@ -70,10 +75,7 @@ public class LikeEventConsumer {
             log.debug("like event processed, videoId={}, userId={}, action={}, delta={}",
                     videoId, userId, action, delta);
         } catch (Exception e) {
-            if (dedupAcquired && dedupKey != null) {
-                redisTemplate.delete(dedupKey);
-            }
-            log.error("consume like event failed: {}", record.value(), e);
+            failureHandler.retryOrDead("like", CONSUMER_GROUP, record, eventId, dedupKey, dedupAcquired, e, ack);
         }
     }
 

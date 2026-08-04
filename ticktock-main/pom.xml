@@ -27,7 +27,7 @@
         <nacos.version>2.2.0</nacos.version>
         <mybatis-spring-boot-starter.version>2.1.0</mybatis-spring-boot-starter.version>
         <pagehelper-spring-boot-starter.version>1.4.6</pagehelper-spring-boot-starter.version>
-        <lombok.version>1.18.22</lombok.version>
+        <lombok.version>1.18.32</lombok.version>
         <hutool-version>5.8.16</hutool-version>
         <java.jwt.version>0.9.1</java.jwt.version>
         <google.guava.version>31.1-jre</google.guava.version>

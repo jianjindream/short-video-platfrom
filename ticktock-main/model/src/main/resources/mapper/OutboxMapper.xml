@@ -5,24 +5,92 @@
         <id column="id" property="id" jdbcType="BIGINT"/>
         <result column="aggregate_type" property="aggregateType" jdbcType="VARCHAR"/>
         <result column="aggregate_id" property="aggregateId" jdbcType="VARCHAR"/>
-        <result column="payload" property="payload" jdbcType="VARCHAR"/>
+        <result column="event_id" property="eventId" jdbcType="VARCHAR"/>
+        <result column="topic" property="topic" jdbcType="VARCHAR"/>
+        <result column="event_key" property="eventKey" jdbcType="VARCHAR"/>
+        <result column="payload" property="payload" jdbcType="LONGVARCHAR"/>
         <result column="created_at" property="createdAt" jdbcType="TIMESTAMP"/>
         <result column="processed" property="processed" jdbcType="TINYINT"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="retry_count" property="retryCount" jdbcType="INTEGER"/>
+        <result column="next_retry_at" property="nextRetryAt" jdbcType="TIMESTAMP"/>
+        <result column="last_error" property="lastError" jdbcType="VARCHAR"/>
+        <result column="processed_at" property="processedAt" jdbcType="TIMESTAMP"/>
     </resultMap>
 
     <select id="selectUnprocessedBatch" resultMap="BaseResultMap">
-        SELECT id, aggregate_type, aggregate_id, payload, created_at, processed
+        SELECT id, aggregate_type, aggregate_id, event_id, topic, event_key, payload, created_at,
+               processed, status, retry_count, next_retry_at, last_error, processed_at
         FROM t_outbox
         WHERE processed = 0
+          AND (topic IS NULL OR topic = 'canal-outbox')
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectPublishableByTopics" resultMap="BaseResultMap">
+        SELECT id, aggregate_type, aggregate_id, event_id, topic, event_key, payload, created_at,
+               processed, status, retry_count, next_retry_at, last_error, processed_at
+        FROM t_outbox
+        WHERE processed = 0
+          AND topic IN
+          <foreach collection="topics" item="topic" open="(" separator="," close=")">
+              #{topic}
+          </foreach>
+          AND (
+              (COALESCE(status, 'NEW') IN ('NEW', 'FAILED')
+                  AND (next_retry_at IS NULL OR next_retry_at &lt;= NOW()))
+              OR (status = 'PUBLISHING' AND next_retry_at &lt;= NOW())
+          )
         ORDER BY id ASC
         LIMIT #{limit}
     </select>
 
     <update id="markAsProcessed">
-        UPDATE t_outbox SET processed = 1
+        UPDATE t_outbox
+        SET processed = 1,
+            status = 'PUBLISHED',
+            processed_at = NOW()
         WHERE id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
+    </update>
+
+    <update id="markOneAsProcessed">
+        UPDATE t_outbox
+        SET processed = 1,
+            status = 'PUBLISHED',
+            processed_at = NOW(),
+            last_error = NULL
+        WHERE id = #{id}
+    </update>
+
+    <update id="markAsPublishing">
+        UPDATE t_outbox
+        SET status = 'PUBLISHING',
+            next_retry_at = #{nextRetryAt}
+        WHERE id = #{id}
+          AND processed = 0
+          AND COALESCE(status, 'NEW') IN ('NEW', 'FAILED', 'PUBLISHING')
+    </update>
+
+    <update id="markForRetry">
+        UPDATE t_outbox
+        SET status = 'FAILED',
+            retry_count = #{retryCount},
+            next_retry_at = #{nextRetryAt},
+            last_error = #{lastError}
+        WHERE id = #{id}
+          AND processed = 0
+    </update>
+
+    <update id="markAsDead">
+        UPDATE t_outbox
+        SET processed = 1,
+            status = 'DEAD',
+            processed_at = NOW(),
+            last_error = #{lastError}
+        WHERE id = #{id}
     </update>
 </mapper>

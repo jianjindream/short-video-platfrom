@@ -18,30 +18,40 @@ import java.time.Duration;
 @Component
 public class CollectEventConsumer {
 
+    private static final String CONSUMER_GROUP = "collect-aggregation-group";
+
     @Autowired
     private CollectCacheService collectCacheService;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    @Autowired
+    private MessageConsumeFailureHandler failureHandler;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @KafkaListener(topics = Constant.TOPIC_COLLECT_EVENTS, groupId = "collect-aggregation-group")
+    @KafkaListener(topics = Constant.TOPIC_COLLECT_EVENTS, groupId = CONSUMER_GROUP)
     public void onMessage(ConsumerRecord<String, String> record, Acknowledgment ack) {
+        String dedupKey = null;
+        boolean dedupAcquired = false;
+        String eventId = null;
         try {
             JsonNode node = objectMapper.readTree(record.value());
-            String eventId = textValue(node, "eventId");
+            eventId = textValue(node, "eventId");
             long videoId = longValue(node, "videoId", 0L);
             long userId = longValue(node, "userId", 0L);
             int delta = (int) longValue(node, "delta", 0L);
 
             if (eventId != null && !eventId.isEmpty()) {
+                dedupKey = "dedup:collect:" + eventId;
                 Boolean first = redisTemplate.opsForValue()
-                        .setIfAbsent("dedup:collect:" + eventId, "1", Duration.ofHours(24));
+                        .setIfAbsent(dedupKey, "1", Duration.ofHours(24));
                 if (!Boolean.TRUE.equals(first)) {
                     ack.acknowledge();
                     return;
                 }
+                dedupAcquired = true;
             }
 
             if (videoId <= 0 || userId <= 0 || delta == 0) {
@@ -54,7 +64,7 @@ public class CollectEventConsumer {
             ack.acknowledge();
             log.debug("collect event aggregated, videoId={}, userId={}, delta={}", videoId, userId, delta);
         } catch (Exception e) {
-            log.error("consume collect event failed: {}", record.value(), e);
+            failureHandler.retryOrDead("collect", CONSUMER_GROUP, record, eventId, dedupKey, dedupAcquired, e, ack);
         }
     }
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="fun.witt.mapper.MessageDeadLetterMapper">
+    <insert id="insertDeadLetter">
+        INSERT INTO t_message_dead_letter
+            (event_id, topic, consumer_group, payload, error_message, retry_count, created_at)
+        VALUES
+            (#{eventId}, #{topic}, #{consumerGroup}, #{payload}, #{errorMessage}, #{retryCount}, NOW())
+    </insert>
+</mapper>

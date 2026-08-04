@@ -88,9 +88,14 @@ public class RelationServiceImpl implements RelationService {
             Outbox outbox = new Outbox();
             outbox.setAggregateType("following");
             outbox.setAggregateId(fromUserId + ":" + toUserId);
+            outbox.setEventId(event.getEventId());
+            outbox.setTopic(Constant.TOPIC_CANAL_OUTBOX);
+            outbox.setEventKey(fromUserId + ":" + toUserId);
             outbox.setPayload(objectMapper.writeValueAsString(event));
             outbox.setCreatedAt(new Date());
             outbox.setProcessed(false);
+            outbox.setStatus("NEW");
+            outbox.setRetryCount(0);
             outboxMapper.insert(outbox);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("serialize relation outbox event failed", e);

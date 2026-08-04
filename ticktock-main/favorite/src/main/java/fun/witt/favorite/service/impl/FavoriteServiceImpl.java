@@ -1,33 +1,43 @@
 package fun.witt.favorite.service.impl;
 
 import fun.witt.constant.Constant;
-import fun.witt.favorite.kafka.LikeEventProducer;
+import fun.witt.favorite.service.FavoriteOutboxService;
 import fun.witt.favorite.service.FavoriteService;
 import fun.witt.favorite.service.LikeCacheService;
+import fun.witt.mapper.FavoriteMapper;
 import fun.witt.mapper.VideoMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
 public class FavoriteServiceImpl implements FavoriteService {
 
+    private static final String ACTION_LIKE = "LIKE";
+    private static final String ACTION_UNLIKE = "UNLIKE";
+
     @Autowired
     private VideoMapper videoMapper;
+
+    @Autowired
+    private FavoriteMapper favoriteMapper;
 
     @Autowired
     private LikeCacheService likeCacheService;
 
     @Autowired
-    private LikeEventProducer likeEventProducer;
+    private FavoriteOutboxService favoriteOutboxService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean likeAction(String actionType, long videoID, long userID, long authorIdFromRequest) {
         Long authorId = videoMapper.selectAuthorId(videoID);
         if (authorId == null) {
@@ -45,23 +55,44 @@ public class FavoriteServiceImpl implements FavoriteService {
     }
 
     private boolean like(long videoId, long userId, long authorId) {
-        boolean changed = likeCacheService.setLiked(videoId, userId);
-        if (!changed) {
-            return true;
+        int inserted = favoriteMapper.insertIgnore(userId, videoId);
+        if (inserted > 0) {
+            favoriteOutboxService.addLikeEvent(videoId, userId, authorId, ACTION_LIKE, 1);
         }
-
-        return likeEventProducer.sendLikeEvent(
-                UUID.randomUUID().toString(), videoId, userId, authorId, "LIKE", 1);
+        afterCommit(() -> likeCacheService.setLiked(videoId, userId),
+                "refresh like bitmap failed, videoId={}, userId={}", videoId, userId);
+        return true;
     }
 
     private boolean unlike(long videoId, long userId, long authorId) {
-        boolean changed = likeCacheService.setUnliked(videoId, userId);
-        if (!changed) {
-            return true;
+        int deleted = favoriteMapper.deleteByUserAndVideo(userId, videoId);
+        if (deleted > 0) {
+            favoriteOutboxService.addLikeEvent(videoId, userId, authorId, ACTION_UNLIKE, -1);
         }
+        afterCommit(() -> likeCacheService.setUnliked(videoId, userId),
+                "refresh unlike bitmap failed, videoId={}, userId={}", videoId, userId);
+        return true;
+    }
 
-        return likeEventProducer.sendLikeEvent(
-                UUID.randomUUID().toString(), videoId, userId, authorId, "UNLIKE", -1);
+    private void afterCommit(Runnable runnable, String errorMessage, long videoId, long userId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            runCacheUpdate(runnable, errorMessage, videoId, userId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runCacheUpdate(runnable, errorMessage, videoId, userId);
+            }
+        });
+    }
+
+    private void runCacheUpdate(Runnable runnable, String errorMessage, long videoId, long userId) {
+        try {
+            runnable.run();
+        } catch (Exception e) {
+            log.warn(errorMessage, videoId, userId, e);
+        }
     }
 
     @Override

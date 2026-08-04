@@ -15,6 +15,8 @@ public class Constant {
     // Outbox aggregate types
     public static final String AGG_TYPE_FOLLOW = "FOLLOW";
     public static final String AGG_TYPE_UNFOLLOW = "UNFOLLOW";
+    public static final String AGG_TYPE_LIKE_EVENT = "LIKE_EVENT";
+    public static final String AGG_TYPE_COLLECT_EVENT = "COLLECT_EVENT";
 
     // Kafka topics
     public static final String TOPIC_CANAL_OUTBOX = "canal-outbox";
@@ -33,6 +35,7 @@ public class Constant {
     public static final String REDIS_USER_COUNTER = "ucounter:%d";
     public static final String REDIS_RELATION_FOLLOWING = "rel:following:%d";
     public static final String REDIS_RELATION_FOLLOWER = "rel:follower:%d";
+    public static final String REDIS_HOT_FEED_ZSET = "feed:v1:hot";
 
     // User counter offsets in bits. Each field is an unsigned 32-bit big-endian segment.
     public static final int OFFSET_FOLLOW_COUNT = 0;

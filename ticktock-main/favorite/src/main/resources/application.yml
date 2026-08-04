@@ -67,6 +67,17 @@ mapper:
   not-empty: false
   identity: MYSQL
 
+favorite:
+  outbox:
+    publisher:
+      fixed-delay-ms: 1000
+      batch-size: 100
+      max-retry: 6
+      send-timeout-ms: 5000
+      inflight-timeout-ms: 300000
+  consumer:
+    max-retry: 3
+
 logging:
   level:
     root: info

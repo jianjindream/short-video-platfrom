@@ -43,12 +43,37 @@ CREATE TABLE `t_outbox` (
     `id` bigint(20) NOT NULL AUTO_INCREMENT,
     `aggregate_type` varchar(32) NOT NULL,
     `aggregate_id` varchar(64) NOT NULL,
+    `event_id` varchar(64) DEFAULT NULL,
+    `topic` varchar(64) DEFAULT NULL,
+    `event_key` varchar(128) DEFAULT NULL,
     `payload` text NOT NULL,
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `processed` tinyint(1) NOT NULL DEFAULT 0,
+    `status` varchar(16) NOT NULL DEFAULT 'NEW',
+    `retry_count` int NOT NULL DEFAULT 0,
+    `next_retry_at` datetime DEFAULT NULL,
+    `last_error` varchar(1024) DEFAULT NULL,
+    `processed_at` datetime DEFAULT NULL,
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_event_id` (`event_id`) USING BTREE,
     KEY `idx_processed_created` (`processed`, `created_at`) USING BTREE,
+    KEY `idx_topic_status_retry` (`topic`, `processed`, `status`, `next_retry_at`) USING BTREE,
     KEY `idx_aggregate_created` (`aggregate_type`, `created_at`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `t_message_dead_letter`;
+CREATE TABLE `t_message_dead_letter` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT,
+    `event_id` varchar(128) NOT NULL,
+    `topic` varchar(64) NOT NULL,
+    `consumer_group` varchar(128) NOT NULL,
+    `payload` text NOT NULL,
+    `error_message` varchar(1024) DEFAULT NULL,
+    `retry_count` int NOT NULL DEFAULT 0,
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_event_id` (`event_id`) USING BTREE,
+    KEY `idx_topic_created` (`topic`, `created_at`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 DROP TABLE IF EXISTS `t_favorite`;

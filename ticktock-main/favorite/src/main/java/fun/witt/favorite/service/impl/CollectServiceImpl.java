@@ -1,23 +1,28 @@
 package fun.witt.favorite.service.impl;
 
 import fun.witt.constant.Constant;
-import fun.witt.favorite.kafka.CollectEventProducer;
 import fun.witt.favorite.service.CollectCacheService;
 import fun.witt.favorite.service.CollectService;
+import fun.witt.favorite.service.FavoriteOutboxService;
 import fun.witt.mapper.CollectMapper;
 import fun.witt.mapper.VideoMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
 public class CollectServiceImpl implements CollectService {
+
+    private static final String ACTION_COLLECT = "COLLECT";
+    private static final String ACTION_UNCOLLECT = "UNCOLLECT";
 
     @Autowired
     private CollectMapper collectMapper;
@@ -29,9 +34,10 @@ public class CollectServiceImpl implements CollectService {
     private CollectCacheService collectCacheService;
 
     @Autowired
-    private CollectEventProducer collectEventProducer;
+    private FavoriteOutboxService favoriteOutboxService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean collectAction(String actionType, long videoId, long userId) {
         Long authorId = videoMapper.selectAuthorId(videoId);
         if (authorId == null) {
@@ -49,43 +55,44 @@ public class CollectServiceImpl implements CollectService {
     }
 
     private boolean collect(long videoId, long userId) {
-        boolean changed = collectCacheService.setCollected(videoId, userId);
-        if (!changed) {
-            return true;
-        }
-
-        int inserted;
-        try {
-            inserted = collectMapper.insertIgnore(userId, videoId);
-        } catch (Exception e) {
-            log.error("write collect row failed, videoId={}, userId={}", videoId, userId, e);
-            return false;
-        }
-
+        int inserted = collectMapper.insertIgnore(userId, videoId);
         if (inserted > 0) {
-            collectEventProducer.sendCollectEvent(UUID.randomUUID().toString(), videoId, userId, "COLLECT", 1);
+            favoriteOutboxService.addCollectEvent(videoId, userId, ACTION_COLLECT, 1);
         }
+        afterCommit(() -> collectCacheService.setCollected(videoId, userId),
+                "refresh collect bitmap failed, videoId={}, userId={}", videoId, userId);
         return true;
     }
 
     private boolean uncollect(long videoId, long userId) {
-        boolean changed = collectCacheService.setUncollected(videoId, userId);
-        if (!changed) {
-            return true;
-        }
-
-        int deleted;
-        try {
-            deleted = collectMapper.deleteByUserAndVideo(userId, videoId);
-        } catch (Exception e) {
-            log.error("delete collect row failed, videoId={}, userId={}", videoId, userId, e);
-            return false;
-        }
-
+        int deleted = collectMapper.deleteByUserAndVideo(userId, videoId);
         if (deleted > 0) {
-            collectEventProducer.sendCollectEvent(UUID.randomUUID().toString(), videoId, userId, "UNCOLLECT", -1);
+            favoriteOutboxService.addCollectEvent(videoId, userId, ACTION_UNCOLLECT, -1);
         }
+        afterCommit(() -> collectCacheService.setUncollected(videoId, userId),
+                "refresh uncollect bitmap failed, videoId={}, userId={}", videoId, userId);
         return true;
+    }
+
+    private void afterCommit(Runnable runnable, String errorMessage, long videoId, long userId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            runCacheUpdate(runnable, errorMessage, videoId, userId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runCacheUpdate(runnable, errorMessage, videoId, userId);
+            }
+        });
+    }
+
+    private void runCacheUpdate(Runnable runnable, String errorMessage, long videoId, long userId) {
+        try {
+            runnable.run();
+        } catch (Exception e) {
+            log.warn(errorMessage, videoId, userId, e);
+        }
     }
 
     @Override
