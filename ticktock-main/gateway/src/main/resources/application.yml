@@ -3,6 +3,11 @@ server:
 spring:
   application:
     name: ticktock-gateway
+  redis:
+    host: redis
+    port: 6379
+    database: 0
+    timeout: 3000
   cloud:
     gateway:
       routes:
@@ -30,6 +35,59 @@ spring:
       discovery:
         server-addr: nacos:8848
         service: ${spring.application.name}
+
+jwt:
+  issuer: ticktock
+  signed: VGlrVG9rCg==
+
+gateway:
+  auth:
+    enabled: true
+    public-paths:
+      - /douyin/user/login
+      - /douyin/user/register
+      - /douyin/user/token/refresh
+      - /douyin/feed
+  rate-limit:
+    enabled: true
+    key-prefix: ticktock:gateway:rate-limit
+    rules:
+      - id: user-login
+        path: /douyin/user/login
+        methods: [POST]
+        key-by: IP
+        limit: 5
+        window-seconds: 60
+      - id: user-register
+        path: /douyin/user/register
+        methods: [POST]
+        key-by: IP
+        limit: 3
+        window-seconds: 60
+      - id: favorite-action
+        path: /douyin/favorite/action
+        methods: [POST]
+        key-by: USER
+        limit: 30
+        window-seconds: 10
+      - id: comment-action
+        path: /douyin/comment/action
+        methods: [POST]
+        key-by: USER
+        limit: 10
+        window-seconds: 60
+      - id: publish-action
+        path: /douyin/publish/action
+        methods: [POST]
+        key-by: USER
+        limit: 3
+        window-seconds: 60
+      - id: publish-upload-init
+        path: /douyin/publish/upload/init
+        methods: [POST]
+        key-by: USER
+        limit: 5
+        window-seconds: 60
 # logging
 logging:
   level:
