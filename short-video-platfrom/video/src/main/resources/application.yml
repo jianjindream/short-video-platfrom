@@ -7,11 +7,11 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
   application:
-    name: ticktock-video
+    name: short-video-platfrom-video
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://ticktock-db:3306/camps_tiktok?useSSL=false&useUnicode=true&characterEncoding=UTF-8&autoReconnect=true
+    url: jdbc:mysql://short-video-platfrom-db:3306/short_video_platfrom?useSSL=false&useUnicode=true&characterEncoding=UTF-8&autoReconnect=true
     username: root
     password: root@2023
     hikari:
@@ -39,8 +39,8 @@ spring:
       max-request-size: 128MB
 
 jwt:
-  issuer: ticktock
-  signed: VGlrVG9rCg==
+  issuer: short-video-platfrom
+  signed: U2hvcnRWaWRlb1BsYXRmcm9tCg==
   access-token-validity-ms: 1800000
   refresh-token-validity-ms: 604800000
 
@@ -68,9 +68,9 @@ logging:
 
 minio:
   endpoint: http://minio:9000      # MinIO服务地址
-  bucket: ticktock
-  access-key-id: ticktock
-  access-key-secret: ticktock@2023
+  bucket: short-video-platfrom
+  access-key-id: short-video-platfrom
+  access-key-secret: short-video-platfrom@2023
   type: 0
   maxLength: 256
   chunk-size: 5242880              # 分片大小：5MB（需 >= 5MB 以满足 S3 ComposeObject 约束）

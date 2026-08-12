@@ -11,23 +11,23 @@ services:
       - "8848:8848"
       - "9848:9848"
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   minio:
     image: minio/minio
     restart: on-failure
     environment:
-      - MINIO_ACCESS_KEY=ticktock
-      - MINIO_SECRET_KEY=ticktock@2023
+      - MINIO_ACCESS_KEY=short-video-platfrom
+      - MINIO_SECRET_KEY=short-video-platfrom@2023
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
     entrypoint: sh
-    command: -c 'mkdir -p /export/ticktock && minio server /export --console-address ":9001"'
+    command: -c 'mkdir -p /export/short-video-platfrom && minio server /export --console-address ":9001"'
     networks:
-      - ticktock-net
-  ticktock-db:
+      - short-video-platfrom-net
+  short-video-platfrom-db:
     image: mariadb:10.4
     restart: on-failure
     environment:
@@ -38,28 +38,28 @@ services:
     ports:
       - "3306:3306"
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   canal-server:
     image: canal/canal-server:v1.1.8
     restart: on-failure
     depends_on:
-      - ticktock-db
+      - short-video-platfrom-db
     ports:
       - "11111:11111"
     environment:
-      - canal.instance.master.address=ticktock-db:3306
+      - canal.instance.master.address=short-video-platfrom-db:3306
       - canal.instance.dbUsername=canal
       - canal.instance.dbPassword=canal
-      - canal.instance.filter.regex=camps_tiktok.t_outbox
+      - canal.instance.filter.regex=short_video_platfrom.t_outbox
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   redis:
     image: redis:7-alpine
     restart: on-failure
     ports:
       - "6379:6379"
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
     restart: on-failure
@@ -67,7 +67,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   kafka:
     image: confluentinc/cp-kafka:7.3.0
     restart: on-failure
@@ -82,66 +82,66 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   comment:
     build:
       context: comment
       dockerfile: Dockerfile
     image: comment:latest
     depends_on:
-      - ticktock-db
+      - short-video-platfrom-db
       - nacos
       - redis
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   favorite:
     build:
       context: favorite
       dockerfile: Dockerfile
     image: favorite:latest
     depends_on:
-      - ticktock-db
+      - short-video-platfrom-db
       - nacos
       - redis
       - kafka
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   relation:
     build:
       context: relation
       dockerfile: Dockerfile
     image: relation:latest
     depends_on:
-      - ticktock-db
+      - short-video-platfrom-db
       - nacos
       - redis
       - kafka
       - canal-server
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   user:
     build:
       context: user
       dockerfile: Dockerfile
     image: user:latest
     depends_on:
-      - ticktock-db
+      - short-video-platfrom-db
       - nacos
       - redis
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   video:
     build:
       context: video
       dockerfile: Dockerfile
     image: video:latest
     depends_on:
-      - ticktock-db
+      - short-video-platfrom-db
       - nacos
       - redis
       - minio
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
   gateway:
     build:
       context: gateway
@@ -153,6 +153,6 @@ services:
       - nacos
       - redis
     networks:
-      - ticktock-net
+      - short-video-platfrom-net
 networks:
-  ticktock-net:
+  short-video-platfrom-net:

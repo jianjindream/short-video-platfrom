@@ -7,11 +7,11 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
   application:
-    name: ticktock-favorite
+    name: short-video-platfrom-favorite
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://ticktock-db:3306/camps_tiktok?useSSL=false&useUnicode=true&characterEncoding=UTF-8&autoReconnect=true
+    url: jdbc:mysql://short-video-platfrom-db:3306/short_video_platfrom?useSSL=false&useUnicode=true&characterEncoding=UTF-8&autoReconnect=true
     username: root
     password: root@2023
     hikari:
@@ -53,8 +53,8 @@ spring:
       ack-mode: manual_immediate
 
 jwt:
-  issuer: ticktock
-  signed: VGlrVG9rCg==
+  issuer: short-video-platfrom
+  signed: U2hvcnRWaWRlb1BsYXRmcm9tCg==
   access-token-validity-ms: 1800000
   refresh-token-validity-ms: 604800000
 

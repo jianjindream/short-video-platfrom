@@ -1,4 +1,4 @@
-USE camps_tiktok;
+USE short_video_platfrom;
 
 ALTER TABLE `t_user`
     ADD COLUMN IF NOT EXISTS `collect_count` bigint(20) NOT NULL DEFAULT 0;

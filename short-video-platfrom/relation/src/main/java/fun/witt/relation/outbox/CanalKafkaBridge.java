@@ -43,7 +43,7 @@ public class CanalKafkaBridge implements SmartLifecycle {
                             @Value("${canal.destination:example}") String destination,
                             @Value("${canal.username:}") String username,
                             @Value("${canal.password:}") String password,
-                            @Value("${canal.filter:camps_tiktok.t_outbox}") String filter,
+                            @Value("${canal.filter:short_video_platfrom.t_outbox}") String filter,
                             @Value("${canal.batch-size:100}") int batchSize,
                             @Value("${canal.interval-ms:1000}") long intervalMs) {
         this.kafkaTemplate = kafkaTemplate;

@@ -10,7 +10,7 @@ public class GatewayRateLimitProperties {
 
     private boolean enabled = true;
 
-    private String keyPrefix = "ticktock:gateway:rate-limit";
+    private String keyPrefix = "short-video-platfrom:gateway:rate-limit";
 
     private List<Rule> rules = new ArrayList<>();
 

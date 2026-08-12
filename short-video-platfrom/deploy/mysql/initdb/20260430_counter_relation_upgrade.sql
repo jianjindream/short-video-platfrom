@@ -1,4 +1,4 @@
-USE camps_tiktok;
+USE short_video_platfrom;
 
 ALTER TABLE `t_relation`
     ADD COLUMN IF NOT EXISTS `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,

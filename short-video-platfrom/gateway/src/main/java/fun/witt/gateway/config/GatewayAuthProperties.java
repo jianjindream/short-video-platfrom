@@ -18,9 +18,9 @@ public class GatewayAuthProperties {
             "/douyin/feed"
     ));
 
-    private String userIdHeader = "X-Ticktock-User-Id";
+    private String userIdHeader = "X-Short-Video-Platfrom-User-Id";
 
-    private String usernameHeader = "X-Ticktock-Username";
+    private String usernameHeader = "X-Short-Video-Platfrom-Username";
 
     public boolean isEnabled() {
         return enabled;

@@ -27,7 +27,7 @@ import java.util.List;
 @Component
 public class GatewaySecurityGlobalFilter implements GlobalFilter, Ordered {
 
-    private static final String USER_ID_ATTR = "ticktock.gateway.userId";
+    private static final String USER_ID_ATTR = "short-video-platfrom.gateway.userId";
 
     private final GatewayAuthProperties authProperties;
 

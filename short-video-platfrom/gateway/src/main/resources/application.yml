@@ -2,7 +2,7 @@ server:
   port: 8008
 spring:
   application:
-    name: ticktock-gateway
+    name: short-video-platfrom-gateway
   redis:
     host: redis
     port: 6379
@@ -11,24 +11,24 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: ticktock-user
-          uri: lb://ticktock-user
+        - id: short-video-platfrom-user
+          uri: lb://short-video-platfrom-user
           predicates:
             - Path=/douyin/user/**
-        - id: ticktock-comment
-          uri: lb://ticktock-comment
+        - id: short-video-platfrom-comment
+          uri: lb://short-video-platfrom-comment
           predicates:
             - Path=/douyin/comment/**
-        - id: ticktock-favorite
-          uri: lb://ticktock-favorite
+        - id: short-video-platfrom-favorite
+          uri: lb://short-video-platfrom-favorite
           predicates:
             - Path=/douyin/favorite/action
-        - id: ticktock-relation
-          uri: lb://ticktock-relation
+        - id: short-video-platfrom-relation
+          uri: lb://short-video-platfrom-relation
           predicates:
             - Path=/douyin/relation/**
-        - id: ticktock-video
-          uri: lb://ticktock-video
+        - id: short-video-platfrom-video
+          uri: lb://short-video-platfrom-video
           predicates:
             - Path=/douyin/feed,/douyin/favorite/**,/douyin/publish/**
     nacos:
@@ -37,8 +37,8 @@ spring:
         service: ${spring.application.name}
 
 jwt:
-  issuer: ticktock
-  signed: VGlrVG9rCg==
+  issuer: short-video-platfrom
+  signed: U2hvcnRWaWRlb1BsYXRmcm9tCg==
 
 gateway:
   auth:
@@ -50,7 +50,7 @@ gateway:
       - /douyin/feed
   rate-limit:
     enabled: true
-    key-prefix: ticktock:gateway:rate-limit
+    key-prefix: short-video-platfrom:gateway:rate-limit
     rules:
       - id: user-login
         path: /douyin/user/login

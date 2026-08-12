@@ -4,12 +4,12 @@
 
     <modelVersion>4.0.0</modelVersion>
     <groupId>fun.witt</groupId>
-    <artifactId>ticktock</artifactId>
+    <artifactId>short-video-platfrom</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>ticktock</name>
-    <description>ticktock project for BitStorm</description>
+    <name>short-video-platfrom</name>
+    <description>Short video microservice platform</description>
 
     <properties>
         <java.version>1.8</java.version>

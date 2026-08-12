@@ -1,8 +1,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-CREATE DATABASE IF NOT EXISTS camps_tiktok;
-USE camps_tiktok;
+CREATE DATABASE IF NOT EXISTS short_video_platfrom;
+USE short_video_platfrom;
 
 DROP TABLE IF EXISTS `t_comment`;
 CREATE TABLE `t_comment` (

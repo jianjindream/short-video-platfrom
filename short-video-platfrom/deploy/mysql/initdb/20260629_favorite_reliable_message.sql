@@ -1,4 +1,4 @@
-USE camps_tiktok;
+USE short_video_platfrom;
 
 ALTER TABLE `t_outbox`
     ADD COLUMN IF NOT EXISTS `event_id` varchar(64) DEFAULT NULL AFTER `aggregate_id`,

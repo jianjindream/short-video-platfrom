@@ -3,4 +3,4 @@ db:
     password: root@2023
     type: mysql
     username: root
-    url: jdbc:mysql://ticktock-db:3306/camps_tiktok
+    url: jdbc:mysql://short-video-platfrom-db:3306/short_video_platfrom

@@ -15,16 +15,16 @@ services:
     image: minio/minio
     restart: on-failure
     environment:
-      - MINIO_ACCESS_KEY=ticktock
-      - MINIO_SECRET_KEY=ticktock@2023
+      - MINIO_ACCESS_KEY=short-video-platfrom
+      - MINIO_SECRET_KEY=short-video-platfrom@2023
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
     entrypoint: sh
-    command: -c 'mkdir -p /export/ticktock && minio server /export --console-address ":9001"'
-  ticktock-db:
+    command: -c 'mkdir -p /export/short-video-platfrom && minio server /export --console-address ":9001"'
+  short-video-platfrom-db:
     image: mariadb:10.4
     restart: on-failure
     environment:
@@ -34,6 +34,6 @@ services:
     ports:
       - "3306:3306"
 networks:
-  ticktock-net:
+  short-video-platfrom-net:
     external: true
 

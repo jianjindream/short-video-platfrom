@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "ticktock-user", path = "/douyin/feign/user")
+@FeignClient(name = "short-video-platfrom-user", path = "/douyin/feign/user")
 public interface UserFeignClient {
 
     @GetMapping("/info")
