@@ -9,6 +9,7 @@ import fun.witt.common.template.MinioTemplate;
 import fun.witt.mapper.VideoMapper;
 import fun.witt.model.Video;
 import fun.witt.video.service.ChunkUploadService;
+import fun.witt.video.service.FeedCacheService;
 import fun.witt.video.support.ChunkUploadConstants;
 import fun.witt.video.utils.FfmpegUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -46,13 +47,16 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
     @Autowired
     private VideoMapper videoMapper;
 
+    @Autowired
+    private FeedCacheService feedCacheService;
+
     @Override
     public ChunkUploadInitVO initUpload(long userId, String fileName, long fileSize, String title) {
         ChunkUploadInitVO vo = new ChunkUploadInitVO();
 
         if (fileName == null || fileName.isEmpty() || fileSize <= 0) {
             vo.setStatusCode(1);
-            vo.setStatusMsg("参数不合法");
+            vo.setStatusMsg("invalid upload params");
             return vo;
         }
 
@@ -95,25 +99,25 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         String metaKey = ChunkUploadConstants.UPLOAD_META_PREFIX + uploadId;
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
         if (meta.isEmpty()) {
-            return ResultVO.fail("上传任务不存在或已过期");
+            return ResultVO.fail("upload task not found or expired");
         }
 
         String status = stringValue(meta.get(ChunkUploadConstants.META_FIELD_STATUS));
         if (!ChunkUploadConstants.STATUS_UPLOADING.equals(status)) {
-            return ResultVO.fail("上传任务状态异常：" + status);
+            return ResultVO.fail("invalid upload task status: " + status);
         }
 
         int chunkCount = Integer.parseInt(stringValue(meta.get(ChunkUploadConstants.META_FIELD_CHUNK_COUNT)));
         if (chunkNumber < 1 || chunkNumber > chunkCount) {
-            return ResultVO.fail("分片编号超出范围：1~" + chunkCount);
+            return ResultVO.fail("chunk number out of range: 1~" + chunkCount);
         }
 
         String chunkObjectName = ChunkUploadConstants.CHUNK_TMP_PREFIX + uploadId + "/" + chunkNumber;
         try {
             minioTemplate.uploadChunk(file.getBytes(), chunkObjectName, file.getContentType());
         } catch (IOException e) {
-            log.error("分片上传失败，uploadId={}, chunkNumber={}", uploadId, chunkNumber, e);
-            return ResultVO.fail("分片上传失败");
+            log.error("upload chunk failed, uploadId={}, chunkNumber={}", uploadId, chunkNumber, e);
+            return ResultVO.fail("upload chunk failed");
         }
 
         long now = System.currentTimeMillis();
@@ -131,7 +135,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         String metaKey = ChunkUploadConstants.UPLOAD_META_PREFIX + uploadId;
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
         if (meta.isEmpty()) {
-            return ResultVO.fail("上传任务不存在或已过期");
+            return ResultVO.fail("upload task not found or expired");
         }
 
         String status = stringValue(meta.get(ChunkUploadConstants.META_FIELD_STATUS));
@@ -139,12 +143,12 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             return ResultVO.ok();
         }
         if (!ChunkUploadConstants.STATUS_UPLOADING.equals(status)) {
-            return ResultVO.fail("上传任务状态异常：" + status);
+            return ResultVO.fail("invalid upload task status: " + status);
         }
 
         long metaUserId = Long.parseLong(stringValue(meta.get(ChunkUploadConstants.META_FIELD_USER_ID)));
         if (metaUserId != userId) {
-            return ResultVO.fail("无权操作此上传任务");
+            return ResultVO.fail("permission denied");
         }
 
         int chunkCount = Integer.parseInt(stringValue(meta.get(ChunkUploadConstants.META_FIELD_CHUNK_COUNT)));
@@ -158,7 +162,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
                     .filter(i -> !uploadedParts.contains(String.valueOf(i)))
                     .boxed()
                     .collect(Collectors.toList());
-            return ResultVO.fail("分片未全部上传，缺少：" + missing);
+            return ResultVO.fail("missing chunks: " + missing);
         }
 
         List<String> sourceObjectNames = IntStream.rangeClosed(1, chunkCount)
@@ -168,8 +172,8 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         try {
             minioTemplate.composeObject(objectName, sourceObjectNames);
         } catch (Exception e) {
-            log.error("合并分片失败，uploadId={}", uploadId, e);
-            return ResultVO.fail("合并分片失败");
+            log.error("compose chunks failed, uploadId={}", uploadId, e);
+            return ResultVO.fail("compose chunks failed");
         }
 
         String coverObjectName;
@@ -183,7 +187,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
                 coverObjectName = "";
             }
         } catch (Exception e) {
-            log.warn("视频封面提取失败，uploadId={}，将使用空封面", uploadId, e);
+            log.warn("extract video cover failed, uploadId={}", uploadId, e);
             coverObjectName = "";
         }
 
@@ -196,8 +200,9 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         video.setCoverUrl(coverObjectName);
         video.setPublishTime(new Date());
         if (videoMapper.insert(video) <= 0) {
-            return ResultVO.fail("视频记录保存失败");
+            return ResultVO.fail("save video record failed");
         }
+        feedCacheService.addVideo(video);
 
         redisTemplate.opsForHash().put(metaKey, ChunkUploadConstants.META_FIELD_STATUS, ChunkUploadConstants.STATUS_COMPLETED);
         minioTemplate.removeObjects(sourceObjectNames);
@@ -213,7 +218,7 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(metaKey);
         if (meta.isEmpty()) {
             vo.setStatusCode(1);
-            vo.setStatusMsg("上传任务不存在或已过期");
+            vo.setStatusMsg("upload task not found or expired");
             return vo;
         }
 

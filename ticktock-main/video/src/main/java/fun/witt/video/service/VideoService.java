@@ -12,6 +12,8 @@ public interface VideoService {
 
     VideoListVO feedVideo(long loginUserID, long lastTime, int count);
 
+    VideoListVO hotFeedVideo(long loginUserID, double maxScore, int count);
+
     VideoListVO listFavoriteVideo(long userID, long loginUserID);
 
     VideoListVO listCollectVideo(long userID, long loginUserID);

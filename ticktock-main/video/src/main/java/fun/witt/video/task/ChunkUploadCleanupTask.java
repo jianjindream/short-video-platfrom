@@ -4,8 +4,8 @@ import fun.witt.common.template.MinioTemplate;
 import fun.witt.video.support.ChunkUploadConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.connection.Cursor;
 import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -61,13 +61,13 @@ public class ChunkUploadCleanupTask {
         String prefix = ChunkUploadConstants.CHUNK_TMP_PREFIX + uploadId + "/";
 
         if (!minioTemplate.removeObjectsByPrefix(prefix)) {
-            log.warn("upload {} 临时分片清理失败，稍后重试", uploadId);
+            log.warn("cleanup upload temp chunks failed, uploadId={}", uploadId);
             return;
         }
 
         redisTemplate.delete(metaKey);
         redisTemplate.delete(partsKey);
-        log.info("upload {} 已超时清理完成", uploadId);
+        log.info("expired upload cleaned, uploadId={}", uploadId);
     }
 
     private Set<String> scanKeys(String pattern) {
@@ -81,13 +81,13 @@ public class ChunkUploadCleanupTask {
                 keys.add(new String(cursor.next(), StandardCharsets.UTF_8));
             }
         } catch (Exception e) {
-            log.error("扫描上传任务键失败 pattern={}", pattern, e);
+            log.error("scan upload task keys failed, pattern={}", pattern, e);
         } finally {
             if (cursor != null) {
                 try {
                     cursor.close();
                 } catch (Exception e) {
-                    log.warn("关闭 Redis 游标失败", e);
+                    log.warn("close Redis cursor failed", e);
                 }
             }
             if (connection != null) {

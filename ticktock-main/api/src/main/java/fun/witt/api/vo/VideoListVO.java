@@ -9,5 +9,7 @@ import java.util.List;
 @Data
 public class VideoListVO extends ResultVO {
     private long nextTime;
+    private Double nextScore;
+    private String feedType;
     private List<VideoExt> videoList;
 }

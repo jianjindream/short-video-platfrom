@@ -15,19 +15,55 @@
         <result column="title" property="title" jdbcType="VARCHAR"/>
     </resultMap>
 
+    <sql id="BaseColumnList">
+        v.id,
+        v.author_id,
+        v.play_url,
+        v.cover_url,
+        v.favorite_count,
+        v.comment_count,
+        v.publish_time,
+        v.title
+    </sql>
+
     <select id="queryVideoOrderByLatestTime" resultMap="BaseResultMap">
-        select v.id,
-               v.author_id,
-               v.play_url,
-               v.cover_url,
-               v.favorite_count,
-               v.comment_count,
-               v.publish_time,
-               v.title
+        select
+        <include refid="BaseColumnList"/>
         from t_video v
-        where publish_time &lt;= #{latestTime}
-        order by publish_time desc
+        where v.publish_time &lt; #{latestTime}
+        order by v.publish_time desc, v.id desc
         limit #{count}
+    </select>
+
+    <select id="queryVideoOrderByHotScore" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumnList"/>
+        from t_video v
+        left join (
+            select video_id, count(*) collect_count
+            from t_collect
+            group by video_id
+        ) c on c.video_id = v.id
+        where v.publish_time &lt; #{latestTime}
+        order by (
+            unix_timestamp(v.publish_time) / 3600
+            + ifnull(v.favorite_count, 0) * 3
+            + ifnull(v.comment_count, 0) * 4
+            + ifnull(c.collect_count, 0) * 5
+        ) desc,
+        v.publish_time desc,
+        v.id desc
+        limit #{count}
+    </select>
+
+    <select id="selectVideoByIdList" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumnList"/>
+        from t_video v
+        where v.id in
+        <foreach collection="videoIdList" item="videoId" open="(" close=")" separator=",">
+            #{videoId}
+        </foreach>
     </select>
 
     <select id="selectAuthorId" resultType="long">
@@ -36,4 +72,10 @@
         where id = #{videoId}
         limit 1
     </select>
+
+    <update id="increaseCommentCount">
+        update t_video
+        set comment_count = greatest(0, comment_count + #{delta})
+        where id = #{videoId}
+    </update>
 </mapper>
